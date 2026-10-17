@@ -70,7 +70,36 @@ For each tool, run the version command and record the output here before proceed
 - Provisional: perform all bare-metal builds inside WSL2 until a native Windows toolchain is verified.
 - Bootloader choice, exact target triples, and linker script details remain provisional until Milestone 1 is implemented.
 
-## 8. Boot Approach Decision
+## 9. Bootloader Decision (provisional)
+
+```text
+Initial bootloader: Rust bootloader crate
+Initial architecture: x86-64
+Initial firmware path: UEFI
+Initial test environment: QEMU
+Initial kernel output: serial console
+ARM64 boot path: deferred until Milestone 2
+Custom bootloader: not part of the initial milestone
+```
+
+## 10. Tool Verification Results
+
+Verified on host (Windows 10.0.26300). Rust, binutils, QEMU, GDB, OVMF not installed; only Git and clang present.
+
+- Git: installed — 2.55.0.windows.3
+- Rust toolchain: MISSING (rustc/cargo/rustup not on PATH)
+- Rust source component: MISSING
+- x86-64 bare-metal target: MISSING
+- Linker (ld/as): MISSING (clang 21.1.6 present but GNU binutils absent)
+- Assembler: MISSING
+- QEMU x86-64: MISSING
+- QEMU ARM64: MISSING
+- UEFI firmware (OVMF): MISSING / not verified
+- GDB: MISSING
+- Build utilities: not verified
+
+These must be installed (provisional plan: inside WSL2 Ubuntu) before kernel work begins. Plan is not silently changed; missing tools are recorded as missing.
+
 
 - First target: x86-64 QEMU (provisional until verified, but recommended and adopted).
 - Initial boot method: existing bootloader (adopted). Writing a custom bootloader is deferred.
