@@ -82,7 +82,70 @@ ARM64 boot path: deferred until Milestone 2
 Custom bootloader: not part of the initial milestone
 ```
 
-## 10. Tool Verification Results
+## 11. Expanded Tool Checklist
+
+Required tools for Milestone 1:
+
+| Tool | Purpose | Status |
+|---|---|---|
+| Rust toolchain | Kernel and bootloader development | MISSING |
+| rust-src | Bare-metal Rust target support | MISSING |
+| llvm-tools-preview | Linker/binary utilities for Rust OS workflows | MISSING |
+| x86-64 bare-metal target | Kernel compilation target | MISSING |
+| QEMU x86-64 | Virtual machine testing | MISSING |
+| OVMF | UEFI firmware for QEMU | MISSING |
+| GDB | Kernel debugging | MISSING |
+| NASM (or another assembler) | Early architecture-specific work | MISSING |
+| Build utilities | Packaging and automation | NOT VERIFIED |
+
+Already present: Git 2.55.0.windows.3, Clang 21.1.6.
+
+## 12. Setup Order (provisional, host-appropriate)
+
+1. Install Rust via rustup.
+2. `rustup component add rust-src`
+3. `rustup component add llvm-tools-preview`
+4. `rustup target add x86_64-unknown-none`
+5. Install QEMU x86-64.
+6. Install/locate OVMF UEFI firmware.
+7. Install GDB.
+8. Install NASM (or equivalent assembler).
+9. Record every installed version in this document.
+
+Use the method appropriate for the host OS; do not blindly use Linux commands on Windows/macOS.
+
+## 13. Verification Checklist
+
+```text
+[ ] rustc runs
+[ ] cargo runs
+[ ] rustup runs
+[ ] rust-src is installed
+[ ] llvm-tools-preview is installed
+[ ] x86-64 bare-metal target is installed
+[ ] QEMU x86-64 runs
+[ ] UEFI firmware is available
+[ ] GDB runs
+[ ] Assembler runs
+[ ] All versions recorded
+```
+
+Confirm: QEMU can start an x86-64 VM; UEFI firmware file locatable; Rust recognizes the bare-metal target; bootloader crate requirements compatible with installed Rust version.
+
+## 14. Pinned Versions (to be filled after install)
+
+```text
+Rust version:
+Cargo version:
+QEMU version:
+GDB version:
+Clang version: 21.1.6
+Assembler version:
+LLVM version:
+OVMF firmware path:
+Host operating system: Windows 10.0.26300
+```
+
 
 Verified on host (Windows 10.0.26300). Rust, binutils, QEMU, GDB, OVMF not installed; only Git and clang present.
 
