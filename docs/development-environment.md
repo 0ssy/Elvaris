@@ -91,6 +91,36 @@ Custom bootloader: not part of the initial milestone
 | llvm-tools-preview | Installed | via rustup |
 | x86-64 bare-metal target | Installed | x86_64-unknown-none (and aarch64-unknown-none) |
 | QEMU x86-64 | Installed | 11.1.0 — `C:\Program Files\QEMU\qemu-system-x86_64.exe` |
+| OVMF / UEFI firmware | Installed (QEMU-bundled edk2) | `C:\Program Files\QEMU\share\edk2-x86_64-code.fd` |
+| GDB | Installed | 18.1 — `C:\msys64\mingw64\bin\gdb.exe` |
+| NASM | Installed | 3.01 — `C:\Users\josep\Desktop\Elvaris\nasm-3.01\nasm-3.01\nasm.exe` |
+| Build utilities | Partial | winget stub broken; clang 21.1.6/22.1.8 present |
+
+## 14. Pinned Versions
+
+```text
+Rust version: 1.99.1 (rustc 1.99.1, 58cf8f9c3 2026-10-13)
+Cargo version: 1.99.1 (5f94df478 2026-08-27)
+QEMU version: 11.1.0 (v11.1.0-12130-ge470268ff4)
+GDB version: 18.1 (C:\msys64\mingw64\bin\gdb.exe)
+Clang version: 21.1.6 (Swift toolchain, on PATH) / 22.1.8 (LLVM)
+Assembler version: NASM 3.01
+LLVM version: 22.1.8 (C:\Program Files\LLVM)
+OVMF firmware path: C:\Program Files\QEMU\share\edk2-x86_64-code.fd
+Host operating system: Windows 10.0.26300 (win32)
+```
+
+All required tools now installed. Remove NASM zip after use if desired.
+```
+
+
+| Tool | Status | Version / Path |
+|---|---|---|
+| Rust toolchain | Installed | rustc 1.99.1, cargo 1.99.1, rustup 1.29.1 — `C:\Users\josep\.cargo\bin\` |
+| rust-src | Installed | via rustup |
+| llvm-tools-preview | Installed | via rustup |
+| x86-64 bare-metal target | Installed | x86_64-unknown-none (and aarch64-unknown-none) |
+| QEMU x86-64 | Installed | 11.1.0 — `C:\Program Files\QEMU\qemu-system-x86_64.exe` |
 | OVMF / UEFI firmware | MISSING (no ovmf-code*.fd; only edk2 build artifacts in QEMU share) | `C:\Program Files\QEMU\share\edk2-x86_64-code.fd` (build artifact) |
 | GDB | MISSING | not found |
 | NASM | MISSING | not found |
