@@ -1,0 +1,11 @@
+[package]
+name = "os"
+version = "0.1.0"
+edition = "2024"
+description = "Elvaris image builder: packages the kernel into a UEFI disk image"
+
+[build-dependencies]
+kernel = { path = "../Kernel", artifact = "bin", target = "x86_64-unknown-none" }
+bootloader = "0.11.17"
+
+[dependencies]
