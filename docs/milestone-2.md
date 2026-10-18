@@ -116,10 +116,10 @@ A development-only exit mechanism lets automated tests distinguish outcomes.
 
 ## Exit criteria
 
-- [ ] Serial output is isolated in one module.
-- [ ] Panic path prints source location and halts.
-- [ ] BootInfo fields are documented and categorized.
-- [ ] Memory map is validated and summarized.
-- [ ] QEMU exits with a distinguishable status code.
-- [ ] An automated boot test passes and fails correctly.
-- [ ] All changes are committed in small, separate commits.
+- [x] Serial output is isolated in one module.
+- [x] Panic path prints source location and halts.
+- [x] BootInfo fields are documented and categorized.
+- [x] Memory map is validated and summarized.
+- [x] QEMU exits with a distinguishable status code.
+- [x] An automated boot test passes and fails correctly.
+- [x] All changes are committed in small, separate commits.
