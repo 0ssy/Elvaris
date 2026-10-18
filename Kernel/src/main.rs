@@ -2,6 +2,7 @@
 #![no_main]
 
 mod serial;
+mod bootinfo;
 
 use bootloader_api::entry_point;
 use bootloader_api::info::{BootInfo, MemoryRegionKind};
@@ -18,16 +19,17 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     // hands off control. COM1 is already programmed by the bootloader.
     unsafe { serial::init() };
 
-    // Count usable memory regions so we can prove the boot information arrived.
-    let usable_count = boot_info
-        .memory_regions
-        .iter()
-        .filter(|r| r.kind == MemoryRegionKind::Usable)
-        .count();
-
     unsafe {
         serial::write_str("Elvaris kernel: started on x86-64\r\n");
         serial::write_str("Elvaris kernel: boot information received\r\n");
+
+        // Count usable memory regions so we can prove the boot information
+        // arrived.
+        let usable_count = boot_info
+            .memory_regions
+            .iter()
+            .filter(|r| r.kind == MemoryRegionKind::Usable)
+            .count();
 
         let mut buf = [0u8; 64];
         let msg = serial::format_usize(
@@ -39,8 +41,11 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         serial::write_newline();
     }
 
+    // Inspect and report the full BootInfo inventory.
+    bootinfo::report(boot_info);
+
     // Halt. No interrupts, no scheduling, no subsystems yet.
-    halt();
+    halt()
 }
 
 /// Halt the CPU. With interrupts disabled this is a permanent stop.
