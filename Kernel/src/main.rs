@@ -3,6 +3,7 @@
 
 mod serial;
 mod bootinfo;
+mod memory;
 
 use bootloader_api::entry_point;
 use bootloader_api::info::{BootInfo, MemoryRegionKind};
@@ -43,6 +44,13 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     // Inspect and report the full BootInfo inventory.
     bootinfo::report(boot_info);
+
+    // Validate and report the memory map.
+    let regions: &[bootloader_api::info::MemoryRegion] = boot_info.memory_regions.as_ref();
+    // SAFETY: the bootloader guarantees the memory_regions slice is valid for
+    // the lifetime of BootInfo, which is 'static mut at entry.
+    let summary = unsafe { memory::validate_and_summarize(regions) };
+    memory::report_summary(&summary);
 
     // Halt. No interrupts, no scheduling, no subsystems yet.
     halt()
