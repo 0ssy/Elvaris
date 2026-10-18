@@ -16,9 +16,6 @@ use bootloader_api::info::{BootInfo, MemoryRegionKind, Optional};
 pub fn report(boot_info: &BootInfo) {
     unsafe {
         serial::write_str("Elvaris kernel: --- BootInfo ---\r\n");
-
-        // Bootloader API version. The kernel and bootloader must agree on the
-        // serialized config format; this is the compatibility check.
         serial::write_str("Elvaris kernel: api_version: ");
         serial::write_fmt(core::format_args!(
             "{}.{}.{}{}",
@@ -28,16 +25,12 @@ pub fn report(boot_info: &BootInfo) {
             if boot_info.api_version.pre_release() { "-pre" } else { "" }
         ));
         serial::write_newline();
-
-        // Memory regions.
         serial::write_str("Elvaris kernel: memory_regions: ");
         serial::write_fmt(core::format_args!(
             "{} entries",
             boot_info.memory_regions.len()
         ));
         serial::write_newline();
-
-        // Kernel ELF location in physical memory.
         serial::write_str("Elvaris kernel: kernel_addr: ");
         serial::write_fmt(core::format_args!("0x{:x}", boot_info.kernel_addr));
         serial::write_newline();
@@ -46,7 +39,6 @@ pub fn report(boot_info: &BootInfo) {
         serial::write_fmt(core::format_args!("0x{:x}", boot_info.kernel_len));
         serial::write_newline();
 
-        // Kernel stack.
         serial::write_str("Elvaris kernel: kernel_stack_bottom: ");
         serial::write_fmt(core::format_args!("0x{:x}", boot_info.kernel_stack_bottom));
         serial::write_newline();
@@ -55,7 +47,6 @@ pub fn report(boot_info: &BootInfo) {
         serial::write_fmt(core::format_args!("0x{:x}", boot_info.kernel_stack_len));
         serial::write_newline();
 
-        // Optional fields. Report their presence explicitly.
         report_optional(
             "physical_memory_offset",
             &boot_info.physical_memory_offset,
