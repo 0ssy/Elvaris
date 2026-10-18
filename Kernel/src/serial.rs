@@ -11,22 +11,18 @@
 /// I/O base address of COM1.
 const COM1_PORT: u16 = 0x3F8;
 
-/// Whether `init()` has been called and the port is ready.
-static mut SERIAL_INITIALIZED: bool = false;
-
 /// Verify that COM1 is present by reading the scratch register. The bootloader
 /// leaves the UART in a working state, so this is a liveness check, not a full
 /// initialization.
 ///
 /// # Safety
-/// Calling this more than once is harmless but is discouraged. Port I/O is
-/// inherently unsafe; this function is `unsafe` because it performs it.
+/// Port I/O is inherently unsafe. Call this once at kernel entry before any
+/// other serial function.
 pub unsafe fn init() {
     // Read the scratch register (offset 7). If the UART is present and
     // uninitialized, this returns 0xFF. We treat any response as "present"
     // because the bootloader has already configured the port.
     let _scratch = read_port(COM1_PORT + 7);
-    SERIAL_INITIALIZED = true;
 }
 
 /// Write a single byte to COM1.
