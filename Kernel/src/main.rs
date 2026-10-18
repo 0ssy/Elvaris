@@ -53,9 +53,30 @@ fn halt() -> ! {
 }
 
 #[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
+fn panic(info: &core::panic::PanicInfo) -> ! {
     unsafe {
-        serial::write_str("Elvaris kernel: panic\r\n");
+        serial::write_str("Elvaris kernel: PANIC\r\n");
+
+        // Print the panic message if one was provided.
+        let msg = info.message();
+        serial::write_str("Elvaris kernel: message: ");
+        serial::write_fmt(core::format_args!("{}", msg));
+        serial::write_newline();
+
+        // Print the source location where available.
+        if let Some(loc) = info.location() {
+            serial::write_str("Elvaris kernel: location: ");
+            serial::write_fmt(core::format_args!(
+                "{}:{}:{}",
+                loc.file(),
+                loc.line(),
+                loc.column()
+            ));
+            serial::write_newline();
+        } else {
+            serial::write_str("Elvaris kernel: location: unknown\r\n");
+        }
     }
+
     halt()
 }
