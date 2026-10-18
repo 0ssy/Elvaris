@@ -63,3 +63,36 @@ It exists to make the project reproducible.
 ## 9. Verification
 
 A tool is considered verified when its `--version` (or equivalent) runs successfully and the bare-metal Rust target compiles a `#![no_std]` crate without host OS dependencies.
+
+## 10. Verified Tool Versions (pinned)
+
+```text
+Git: 2.55.0.windows.3
+Rust (stable): 1.99.1 (58cf8f9c3 2026-10-13)
+Rust (nightly, build toolchain): 1.101.0-nightly (8006091eb 2026-10-17)
+QEMU x86-64: 11.1.0 (C:\Program Files\QEMU\qemu-system-x86_64.exe)
+GDB: 18.1 (C:\msys64\mingw64\bin\gdb.exe)
+Clang: 21.1.6 (Swift toolchain) / 22.1.8 (LLVM, C:\Program Files\LLVM\bin)
+NASM: 3.01 (C:\Users\josep\Desktop\Elvaris\nasm-3.01\nasm-3.01\nasm.exe)
+OVMF UEFI firmware: C:\Users\josep\Desktop\Elvaris\ovmf-x86_64\OVMF_CODE.fd
+Host OS: Windows 10.0.26300 (win32)
+```
+
+## 11. Build Toolchain (nightly)
+
+The `bootloader` crate (pinned at `0.11.17`, see `docs/bootloader.md`) requires
+the unstable `artifact-dependencies` feature, so the project builds with the
+**nightly** toolchain, not stable.
+
+Installed nightly toolchain:
+
+```text
+nightly-x86_64-pc-windows-msvc 1.101.0-nightly (8006091eb 2026-10-17)
+  components: rustc, cargo, rust-std, rust-src, llvm-tools-preview,
+              rustfmt, clippy
+  targets: x86_64-pc-windows-msvc, x86_64-unknown-none
+```
+
+The project pins the toolchain via `rust-toolchain.toml` so that `cargo`
+invocations automatically select it. The stable toolchain remains installed
+for general host development.
