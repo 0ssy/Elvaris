@@ -2,6 +2,7 @@
 #![no_main]
 
 mod serial;
+mod pmm;
 mod bootinfo;
 mod memory;
 mod exit;
@@ -52,6 +53,17 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     // the lifetime of BootInfo, which is 'static mut at entry.
     let summary = unsafe { memory::validate_and_summarize(regions) };
     memory::report_summary(&summary);
+
+    // Physical memory management initialization.
+    let mut pmm = pmm::phys_alloc::PhysFrameAllocator::new();
+    let _ = pmm.init(regions);
+    unsafe {
+        serial::write_str("Elvaris kernel: pmm: usable_regions=");
+        serial::write_fmt(core::format_args!("{}", pmm.usable_region_count()));
+        serial::write_str(" total_frames=");
+        serial::write_fmt(core::format_args!("{}", pmm.total_frames()));
+        serial::write_newline();
+    }
 
     // Signal successful boot to the host via the QEMU debugcon device, then
     // halt. This is development-only; see exit.rs.

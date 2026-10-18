@@ -1,0 +1,104 @@
+//! Physical frame allocator (simple bump allocator for milestone 3 foundation).
+//!
+//! Tracks usable physical memory frames and supports allocation.
+
+use crate::pmm::frame::FRAME_SIZE;
+use bootloader_api::info::{MemoryRegion, MemoryRegionKind};
+
+const MAX_REGIONS: usize = 256;
+
+#[derive(Debug, Clone, Copy)]
+struct ManagedRegion {
+    start: u64,
+    end: u64, // exclusive, frame-aligned
+    cursor: u64,
+}
+
+#[derive(Debug)]
+pub struct PhysFrameAllocator {
+    regions: [ManagedRegion; MAX_REGIONS],
+    count: usize,
+    total_frames: u64,
+    allocated_frames: u64,
+}
+
+impl PhysFrameAllocator {
+    pub fn new() -> Self {
+        Self {
+            regions: [ManagedRegion { start: 0, end: 0, cursor: 0 }; MAX_REGIONS],
+            count: 0,
+            total_frames: 0,
+            allocated_frames: 0,
+        }
+    }
+
+    pub fn init(&mut self, regions: &[MemoryRegion]) -> bool {
+        self.count = 0;
+        self.total_frames = 0;
+        self.allocated_frames = 0;
+
+        for r in regions {
+            if self.count >= MAX_REGIONS {
+                return false;
+            }
+            if r.kind != MemoryRegionKind::Usable {
+                continue;
+            }
+            if r.start >= r.end {
+                continue;
+            }
+            let aligned_start = ((r.start + FRAME_SIZE - 1) / FRAME_SIZE) * FRAME_SIZE;
+            let aligned_end = (r.end / FRAME_SIZE) * FRAME_SIZE;
+            if aligned_end <= aligned_start {
+                continue;
+            }
+            let frames = (aligned_end - aligned_start) / FRAME_SIZE;
+            if frames == 0 {
+                continue;
+            }
+            self.regions[self.count] = ManagedRegion {
+                start: aligned_start,
+                end: aligned_end,
+                cursor: aligned_start,
+            };
+            self.count += 1;
+            self.total_frames += frames;
+        }
+        true
+    }
+
+    pub fn total_frames(&self) -> u64 {
+        self.total_frames
+    }
+
+    pub fn allocated_frames(&self) -> u64 {
+        self.allocated_frames
+    }
+
+    pub fn free_frames(&self) -> u64 {
+        self.total_frames.saturating_sub(self.allocated_frames)
+    }
+
+    pub fn usable_region_count(&self) -> usize {
+        self.count
+    }
+
+    pub fn allocate_frame(&mut self) -> Option<u64> {
+        for i in 0..self.count {
+            let r = &mut self.regions[i];
+            if r.cursor + FRAME_SIZE <= r.end {
+                let addr = r.cursor;
+                r.cursor += FRAME_SIZE;
+                self.allocated_frames += 1;
+                return Some(addr);
+            }
+        }
+        None
+    }
+}
+
+impl Default for PhysFrameAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}

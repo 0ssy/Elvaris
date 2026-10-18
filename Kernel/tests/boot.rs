@@ -21,6 +21,7 @@ const REQUIRED_MARKERS: &[&str] = &[
     "Elvaris kernel: --- end BootInfo ---",
     "Elvaris kernel: --- memory map ---",
     "Elvaris kernel: memory map: valid",
+    "Elvaris kernel: pmm: usable_regions=",
     "Elvaris kernel: --- end memory map ---",
 ];
 
