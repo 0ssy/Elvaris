@@ -4,11 +4,28 @@ version = "0.1.0"
 edition = "2024"
 description = "Elvaris bare-metal kernel (x86-64, no_std)"
 
+[features]
+default = []
+bare = []
+
 [dependencies]
 bootloader_api = "0.11.17"
 
-[profile.dev]
-panic = "abort"
+# The kernel binary is `#![no_main]` and links only for `x86_64-unknown-none`.
+# It cannot be linked for the host target, so it's gated behind the `bare`
+# feature and excluded from `cargo test` by default.
+[[bin]]
+name = "kernel"
+path = "src/main.rs"
+required-features = ["bare"]
+test = false
 
-[profile.release]
-panic = "abort"
+# The integration test boots the kernel in QEMU, so it runs on the host
+# target and links against the standard library.
+[[test]]
+name = "boot"
+path = "tests/boot.rs"
+
+# `panic = "abort"` is defined at the workspace root (see ../Cargo.toml).
+# Profiles in non-root packages are silently ignored by Cargo, so we keep
+# them out of this file to avoid confusion.
