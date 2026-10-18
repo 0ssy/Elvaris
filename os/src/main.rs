@@ -1,3 +1,11 @@
+//! Elvaris image runner.
+//!
+//! The build script produces `uefi.img` (a GPT disk image containing the
+//! UEFI bootloader and the compiled kernel). This binary launches QEMU with
+//! the OVMF firmware, the image attached to a virtio-blk device, and the
+//! debugcon device connected to stdout so the kernel's exit status code is
+//! visible to the host.
+
 use std::process::Command;
 
 fn main() {
@@ -20,7 +28,12 @@ fn main() {
             "-drive",
             &format!("if=pflash,unit=1,format=raw,file={}", ovmf_vars.display()),
             "-drive",
-            &format!("if=none,format=raw,file={}", image.display()),
+            &format!("if=none,format=raw,file={},id=hd0", image.display()),
+            "-device", "virtio-blk-pci,drive=hd0,bootindex=2",
+            // The kernel writes a 4-byte exit status to port 0x402. Connect
+            // the debugcon to stdout so the host can read it.
+            "-debugcon", "stdio",
+            "-global", "isa-debugcon.iobase=0x402",
         ])
         .status()
         .expect("failed to launch QEMU");

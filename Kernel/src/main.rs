@@ -4,6 +4,7 @@
 mod serial;
 mod bootinfo;
 mod memory;
+mod exit;
 
 use bootloader_api::entry_point;
 use bootloader_api::info::{BootInfo, MemoryRegionKind};
@@ -52,6 +53,10 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     let summary = unsafe { memory::validate_and_summarize(regions) };
     memory::report_summary(&summary);
 
+    // Signal successful boot to the host via the QEMU debugcon device, then
+    // halt. This is development-only; see exit.rs.
+    unsafe { exit::exit(exit::EXIT_SUCCESS) };
+
     // Halt. No interrupts, no scheduling, no subsystems yet.
     halt()
 }
@@ -89,6 +94,9 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
         } else {
             serial::write_str("Elvaris kernel: location: unknown\r\n");
         }
+
+        // Signal the panic exit code to the host before halting.
+        exit::exit(exit::EXIT_PANIC);
     }
 
     halt()
