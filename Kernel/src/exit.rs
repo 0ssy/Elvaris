@@ -28,17 +28,21 @@ pub const EXIT_UNEXPECTED_HALT: u32 = 0x12;
 pub unsafe fn exit(status: u32) {
     // QEMU's debugcon device accepts one byte at a time on port 0x402.
     // Write the status code as four little-endian bytes.
-    write_port(DEBUGCON_PORT, (status & 0xFF) as u8);
-    write_port(DEBUGCON_PORT, ((status >> 8) & 0xFF) as u8);
-    write_port(DEBUGCON_PORT, ((status >> 16) & 0xFF) as u8);
-    write_port(DEBUGCON_PORT, ((status >> 24) & 0xFF) as u8);
+    unsafe {
+        write_port(DEBUGCON_PORT, (status & 0xFF) as u8);
+        write_port(DEBUGCON_PORT, ((status >> 8) & 0xFF) as u8);
+        write_port(DEBUGCON_PORT, ((status >> 16) & 0xFF) as u8);
+        write_port(DEBUGCON_PORT, ((status >> 24) & 0xFF) as u8);
+    }
 }
 
 unsafe fn write_port(port: u16, value: u8) {
-    core::arch::asm!(
-        "out dx, al",
-        in("dx") port,
-        in("al") value,
-        options(nomem, nostack, preserves_flags)
-    );
+    unsafe {
+        core::arch::asm!(
+            "out dx, al",
+            in("dx") port,
+            in("al") value,
+            options(nomem, nostack, preserves_flags)
+        );
+    }
 }

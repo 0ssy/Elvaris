@@ -22,7 +22,9 @@ pub unsafe fn init() {
     // Read the scratch register (offset 7). If the UART is present and
     // uninitialized, this returns 0xFF. We treat any response as "present"
     // because the bootloader has already configured the port.
-    let _scratch = read_port(COM1_PORT + 7);
+    unsafe {
+        let _scratch = read_port(COM1_PORT + 7);
+    }
 }
 
 /// Write a single byte to COM1.
@@ -30,25 +32,27 @@ pub unsafe fn init() {
 /// # Safety
 /// Requires that the UART is ready. Callers must ensure `init()` ran first.
 pub unsafe fn write_byte(byte: u8) {
-    write_port(COM1_PORT, byte);
+    unsafe { write_port(COM1_PORT, byte) };
 }
 
 /// Write a byte slice to COM1.
 pub unsafe fn write_bytes(bytes: &[u8]) {
     for &b in bytes {
-        write_port(COM1_PORT, b);
+        unsafe { write_port(COM1_PORT, b) };
     }
 }
 
 /// Write a newline (CRLF) to COM1, matching the serial console convention.
 pub unsafe fn write_newline() {
-    write_port(COM1_PORT, b'\r');
-    write_port(COM1_PORT, b'\n');
+    unsafe {
+        write_port(COM1_PORT, b'\r');
+        write_port(COM1_PORT, b'\n');
+    }
 }
 
 /// Write a string slice to COM1.
 pub unsafe fn write_str(s: &str) {
-    write_bytes(s.as_bytes());
+    unsafe { write_bytes(s.as_bytes()) }
 }
 
 /// Write formatted arguments to COM1.
@@ -74,23 +78,27 @@ pub unsafe fn write_fmt(args: core::fmt::Arguments<'_>) {
 /// Read a byte from an I/O port.
 unsafe fn read_port(port: u16) -> u8 {
     let value: u8;
-    core::arch::asm!(
-        "in al, dx",
-        in("dx") port,
-        out("al") value,
-        options(nomem, nostack, preserves_flags)
-    );
+    unsafe {
+        core::arch::asm!(
+            "in al, dx",
+            in("dx") port,
+            out("al") value,
+            options(nomem, nostack, preserves_flags)
+        );
+    }
     value
 }
 
 /// Write a byte to an I/O port.
 unsafe fn write_port(port: u16, value: u8) {
-    core::arch::asm!(
-        "out dx, al",
-        in("dx") port,
-        in("al") value,
-        options(nomem, nostack, preserves_flags)
-    );
+    unsafe {
+        core::arch::asm!(
+            "out dx, al",
+            in("dx") port,
+            in("al") value,
+            options(nomem, nostack, preserves_flags)
+        );
+    }
 }
 
 /// Format an unsigned decimal integer into `buf` after `prefix`, returning the
