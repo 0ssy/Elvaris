@@ -30,13 +30,24 @@ fn main() {
             "-drive",
             &format!("if=none,format=raw,file={},id=hd0", image.display()),
             "-device", "virtio-blk-pci,drive=hd0,bootindex=2",
-            // The kernel writes a 4-byte exit status to port 0x402. Connect
-            // the debugcon to stdout so the host can read it.
+            // The kernel writes a 4-byte exit status to port 0x402. The
+            // isa-debug-exit device makes QEMU terminate with that byte as its
+            // exit code, so automated tests can distinguish success, panic,
+            // unexpected halt, and timeout.
+            "-device", "isa-debug-exit,iobase=0x402,iosize=1",
+            // Keep the debugcon on a separate port so the raw exit bytes are
+            // also visible on stdout for manual inspection without colliding
+            // with the debug-exit device.
             "-debugcon", "stdio",
-            "-global", "isa-debugcon.iobase=0x402",
+            "-global", "isa-debugcon.iobase=0x403",
         ])
         .status()
         .expect("failed to launch QEMU");
 
-    assert!(status.success(), "QEMU exited with status {:?}", status.code());
+    // QEMU exits with `(exit_byte << 1) | 1` when the isa-debug-exit device
+    // receives a byte. The kernel writes `EXIT_SUCCESS` (0x10) on a clean
+    // boot, so the expected host code is `(0x10 << 1) | 1` = 33. A panic
+    // writes 0x11 and yields 35; anything else is a failure.
+    let code = status.code().expect("QEMU was killed by a signal");
+    assert_eq!(code, 33, "QEMU exited with unexpected code {}", code);
 }

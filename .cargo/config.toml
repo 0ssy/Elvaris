@@ -1,11 +1,13 @@
 [unstable]
 bindeps = true
 
-[build]
-target = "x86_64-pc-windows-msvc"
-
+# The kernel is a bare-metal binary for `x86_64-unknown-none`. It must be
+# built with `--target x86_64-unknown-none` explicitly; this section holds
+# target-specific settings that only apply when that flag is used.
+#
+# The `os` package is a host binary (it builds the UEFI image and runs QEMU),
+# so it must NOT inherit the bare-metal target. Build it with plain
+# `cargo build -p os`, which uses the host triple.
 [target.x86_64-unknown-none]
-# No linker script yet; the `bootloader_api::entry_point!` macro emits the
-# `_start` entry symbol, which the default linker script uses. Keep this
-# section empty for now so the first build can fail loudly at link time and
-# teach us what the linker actually needs.
+# The `bootloader_api::entry_point!` macro emits the `_start` entry symbol,
+# which the default linker script uses. No custom linker script is needed.

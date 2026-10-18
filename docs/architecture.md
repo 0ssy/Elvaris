@@ -1,6 +1,4 @@
-Copy the following into `docs/architecture.md`:
 
-```markdown
 # Elvaris Architecture
 
 ## 1. Overview
