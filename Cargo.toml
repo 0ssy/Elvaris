@@ -1,6 +1,3 @@
 [workspace]
 resolver = "3"
 members = ["Kernel", "os"]
-
-[workspace.package]
-edition = "2024"
