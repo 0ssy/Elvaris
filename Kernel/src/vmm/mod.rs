@@ -16,3 +16,5 @@ pub mod addr;
 
 #[cfg(test)]
 mod tests;
+
+pub mod fault;
