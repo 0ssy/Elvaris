@@ -6,3 +6,5 @@ pub mod pmm;
 pub mod bootinfo;
 pub mod memory;
 pub mod exit;
+
+pub mod vmm;
