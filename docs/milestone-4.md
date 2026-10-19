@@ -126,19 +126,19 @@ Demand paging, COW, etc. are out of scope.
 
 ## Exit Criteria
 
-- [ ] Initial paging state is documented
-- [ ] Physical-to-virtual translation is documented
-- [ ] Page-table hierarchy is understood and documented
-- [ ] Page-table frames come from the PMM
-- [ ] 4 KiB mappings work
-- [ ] Mapping flags are validated
-- [ ] Kernel/user permissions are defined
-- [ ] Invalid mappings are rejected
-- [ ] Page-fault diagnostics work
-- [ ] Unit tests cover address and flag logic
-- [ ] QEMU boot test still passes
-- [ ] PMM tests still pass
-- [ ] Limitations are documented
+- [x] Initial paging state is documented
+- [x] Physical-to-virtual translation is documented
+- [x] Page-table hierarchy is understood and documented
+- [x] Page-table frames come from the PMM
+- [x] 4 KiB mappings work
+- [x] Mapping flags are validated
+- [x] Kernel/user permissions are defined
+- [x] Invalid mappings are rejected
+- [x] Page-fault diagnostics work
+- [x] Unit tests cover address and flag logic
+- [x] QEMU boot test still passes
+- [x] PMM tests still pass
+- [x] Limitations are documented
 
 ## Implementation Order
 
