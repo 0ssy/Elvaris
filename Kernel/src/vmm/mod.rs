@@ -9,3 +9,5 @@
 #![allow(dead_code)]
 
 pub mod entry;
+
+pub mod page_table;
