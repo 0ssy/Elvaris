@@ -36,19 +36,23 @@ impl Frame {
 }
 
 /// Normalize a usable region into a range of frame-aligned addresses.
-/// Returns (start_frame_addr, end_frame_addr_exclusive) aligned to frame size.
-/// Drops partial trailing frames.
-pub fn normalize_region(region: &MemoryRegion) -> Option<(u64, u64)> {
-    if region.start >= region.end {
-        return None;
+    /// Returns (start_frame_addr, end_frame_addr_exclusive) aligned to frame size.
+    /// Drops partial trailing frames.
+    pub fn normalize_region(region: &MemoryRegion) -> Option<(u64, u64)> {
+        if region.start >= region.end {
+            return None;
+        }
+        let aligned_start = ((region.start + FRAME_SIZE - 1) / FRAME_SIZE) * FRAME_SIZE;
+        let n = (region.end - aligned_start) / FRAME_SIZE;
+        if n == 0 {
+            return None;
+        }
+        let aligned_end = aligned_start + n * FRAME_SIZE;
+        if aligned_end <= aligned_start {
+            return None;
+        }
+        Some((aligned_start, aligned_end))
     }
-    let aligned_start = ((region.start + FRAME_SIZE - 1) / FRAME_SIZE) * FRAME_SIZE;
-    let aligned_end = (region.end / FRAME_SIZE) * FRAME_SIZE;
-    if aligned_end <= aligned_start {
-        return None;
-    }
-    Some((aligned_start, aligned_end))
-}
 
 /// Count how many full frames fit in the given byte range.
 pub fn frame_count(bytes: u64) -> u64 {

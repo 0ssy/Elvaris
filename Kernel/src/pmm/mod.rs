@@ -4,3 +4,6 @@
 
 pub mod frame;
 pub mod phys_alloc;
+
+#[cfg(test)]
+mod tests;
