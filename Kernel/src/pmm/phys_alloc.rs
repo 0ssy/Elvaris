@@ -1,6 +1,9 @@
 //! Physical frame allocator (simple bump allocator for milestone 3 foundation).
 //!
-//! Tracks usable physical memory frames and supports allocation.
+//! Tracks usable physical memory frames and supports allocation. This is a
+//! non-reclaiming (bump) allocator - freed frames are not returned to the pool.
+//! Deallocation is not yet implemented; this limitation is documented and will
+//! be addressed when switching to a bitmap-based allocator.
 
 use crate::pmm::frame::FRAME_SIZE;
 use bootloader_api::info::{MemoryRegion, MemoryRegionKind};
@@ -14,6 +17,22 @@ struct ManagedRegion {
     cursor: u64,
 }
 
+/// Physical frame allocator managing usable memory regions.
+///
+/// # Safety Invariants
+/// 1. Every allocated frame is 4 KiB aligned.
+/// 2. Every allocated frame is within a bootloader-marked usable region.
+/// 3. No frame is allocated twice (enforced by bump cursor).
+/// 4. The allocator never hands out memory that overlaps kernel/bootloader/
+///    firmware-reserved structures (only allocates from Usable regions).
+/// 5. Region arithmetic is checked (alignments computed carefully).
+/// 6. Unknown memory is never treated as free.
+/// 7. Partial frames are never returned.
+///
+/// # Limitations
+/// - Non-reclaiming: once allocated, frames cannot be freed (bump allocator).
+/// - Single-threaded: no synchronization primitives; requires external locking
+///   if used across multiple cores/threads.
 #[derive(Debug)]
 pub struct PhysFrameAllocator {
     regions: [ManagedRegion; MAX_REGIONS],
@@ -32,6 +51,11 @@ impl PhysFrameAllocator {
         }
     }
 
+    /// Initialize the allocator from the bootloader's memory map.
+    ///
+    /// Only MemoryRegionKind::Usable regions are considered. Regions are
+    /// normalized to frame-aligned boundaries; partial trailing frames are
+    /// dropped. Returns true if initialization succeeded.
     pub fn init(&mut self, regions: &[MemoryRegion]) -> bool {
         self.count = 0;
         self.total_frames = 0;
@@ -83,6 +107,10 @@ impl PhysFrameAllocator {
         self.count
     }
 
+    /// Allocate a physical frame. Returns the physical address of the frame,
+    /// or None if no frames are available (exhaustion).
+    ///
+    /// Allocated frames are 4 KiB aligned and never double-allocated.
     pub fn allocate_frame(&mut self) -> Option<u64> {
         for i in 0..self.count {
             let r = &mut self.regions[i];
@@ -94,6 +122,17 @@ impl PhysFrameAllocator {
             }
         }
         None
+    }
+
+    /// Deallocate a physical frame.
+    ///
+    /// # Limitation
+    /// This bump allocator does not support deallocation. Calling this
+    /// method is a no-op and is provided for API compatibility; it will
+    /// be replaced with proper free semantics in a future bitmap allocator.
+    #[allow(dead_code)]
+    pub fn deallocate_frame(&mut self, _addr: u64) {
+        // Non-reclaiming allocator - no-op
     }
 }
 
