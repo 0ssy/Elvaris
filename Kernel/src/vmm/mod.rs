@@ -13,3 +13,6 @@ pub mod entry;
 pub mod page_table;
 
 pub mod addr;
+
+#[cfg(test)]
+mod tests;
