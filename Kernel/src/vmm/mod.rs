@@ -18,3 +18,5 @@ pub mod addr;
 mod tests;
 
 pub mod fault;
+
+pub mod mapper;
