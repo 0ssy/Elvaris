@@ -27,7 +27,15 @@ pub const HARDWARE_VECTOR_LAST: u8 = 47;
 /// The vector is deliberately outside the ranges used by the CPU exceptions
 /// and by the legacy interrupt controllers, so a stray interrupt cannot be
 /// mistaken for a timer tick.
-pub const TIMER_VECTOR: u8 = 0x80;
+pub const TIMER_VECTOR: u8 = 0x40;
+
+/// Vector used by the system-call instruction of the user mode.
+///
+/// The entry of this vector is the only one the processor accepts from user
+/// mode: its requested privilege level is three, while every other entry
+/// belongs to ring zero. A user program therefore cannot raise any other
+/// interrupt, and the kernel stays in control of the entry points.
+pub const SYSCALL_VECTOR: u8 = 0x80;
 
 /// Number of descriptors in the interrupt descriptor table.
 pub const IDT_ENTRY_COUNT: usize = 256;

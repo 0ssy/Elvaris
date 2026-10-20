@@ -9,30 +9,30 @@ global_asm!(
     "switch_context:\n",
     // Save current context (callee-saved registers)
     // RDI = current context, RSI = next context
-    "    movq %r15, 0(%rdi)\n",
-    "    movq %r14, 8(%rdi)\n",
-    "    movq %r13, 16(%rdi)\n",
-    "    movq %r12, 24(%rdi)\n",
-    "    movq %rbp, 32(%rdi)\n",
-    "    movq %rbx, 40(%rdi)\n",
+    "    mov [rdi], r15\n",
+    "    mov [rdi+8], r14\n",
+    "    mov [rdi+16], r13\n",
+    "    mov [rdi+24], r12\n",
+    "    mov [rdi+32], rbp\n",
+    "    mov [rdi+40], rbx\n",
     // Save RIP (return address)
-    "    movq (%rsp), %rax\n",
-    "    movq %rax, 48(%rdi)\n",
+    "    mov rax, [rsp]\n",
+    "    mov [rdi+48], rax\n",
     // Save RSP
-    "    leaq 8(%rsp), %rax\n",
-    "    movq %rax, 56(%rdi)\n",
+    "    lea rax, [rsp+8]\n",
+    "    mov [rdi+56], rax\n",
     // Restore next context
-    "    movq 0(%rsi), %r15\n",
-    "    movq 8(%rsi), %r14\n",
-    "    movq 16(%rsi), %r13\n",
-    "    movq 24(%rsi), %r12\n",
-    "    movq 32(%rsi), %rbp\n",
-    "    movq 40(%rsi), %rbx\n",
+    "    mov r15, [rsi]\n",
+    "    mov r14, [rsi+8]\n",
+    "    mov r13, [rsi+16]\n",
+    "    mov r12, [rsi+24]\n",
+    "    mov rbp, [rsi+32]\n",
+    "    mov rbx, [rsi+40]\n",
     // Restore RSP
-    "    movq 56(%rsi), %rsp\n",
+    "    mov rsp, [rsi+56]\n",
     // Restore RIP and jump
-    "    movq 48(%rsi), %rax\n",
-    "    pushq %rax\n",
+    "    mov rax, [rsi+48]\n",
+    "    push rax\n",
     "    ret\n",
 );
 

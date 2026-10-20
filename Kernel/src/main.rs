@@ -9,9 +9,12 @@ mod pmm;
 mod bootinfo;
 mod memory;
 mod exit;
+mod serial;
 mod vmm;
 mod heap;
 mod cpu;
+mod user;
+mod process;
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
@@ -49,6 +52,13 @@ pub static BOOTLOADER_CONFIG: BootloaderConfig = {
 };
 
 entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
+
+/// The global allocator of the kernel.
+///
+/// The kernel heap is the only allocator the kernel has, so every allocation
+/// the Rust runtime performs goes through it.
+#[global_allocator]
+static GLOBAL_ALLOCATOR: heap::KernelGlobalAlloc = heap::KernelGlobalAlloc;
 
 /// Elvaris kernel entry point.
 ///
@@ -112,7 +122,6 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     if phys_offset.is_none() {
         panic!("vmm: the bootloader did not provide a physical memory mapping");
     }
-    let frames_before = pmm.allocated_frames();
 
     // SAFETY: CR3 belongs to the kernel address space and the direct map
     // reported by the bootloader is present in it.
@@ -155,7 +164,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     // grow by at least the number of heap pages, and by no more than that
     // plus the page-table frames the mapping needed plus the frame the
     // mapper refuses to map (physical address zero).
-    let frames_used = pmm.allocated_frames() - frames_before;
+    let frames_used = mapper.take_allocated_frames();
     if frames_used < HEAP_MAPPED_PAGES as u64 || frames_used > HEAP_MAPPED_PAGES as u64 + 32 {
         panic!("heap: unexpected pmm frame usage: {}", frames_used);
     }
@@ -163,11 +172,6 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         serial::write_str("Elvaris kernel: heap: pmm_frames=");
         serial::write_fmt(core::format_args!("{}", frames_used));
         serial::write_str(" ok\r\n");
-        serial::write_str("Elvaris kernel: pmm: allocated_frames=");
-        serial::write_fmt(core::format_args!("{}", pmm.allocated_frames()));
-        serial::write_str(" free_frames=");
-        serial::write_fmt(core::format_args!("{}", pmm.free_frames()));
-        serial::write_newline();
     }
 
     // Exercise the heap: allocate, write, verify, free, exhaust.
@@ -228,6 +232,54 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         }
         serial::write_newline();
         serial::write_str("Elvaris kernel: --- end interrupts ---\r\n");
+    }
+
+    // User mode: the kernel creates an address space for one user program,
+    // loads a fixed image into it, enters ring 3, and takes the program down
+    // again when it ends.
+    let user_interrupt_stack = match user::allocate_interrupt_stack() {
+        Ok(top) => top,
+        Err(err) => panic!("user: could not allocate the interrupt stack: {:?}", err),
+    };
+    // The processor switches to this stack whenever an event arrives from
+    // user mode, so the events of the user program never reach the stack the
+    // kernel itself runs on.
+    cpu::tss::set_privilege_stack(user_interrupt_stack);
+    unsafe {
+        serial::write_str("Elvaris kernel: user: interrupt stack=0x");
+        serial::write_fmt(core::format_args!("{:x}", user_interrupt_stack));
+        serial::write_newline();
+    }
+
+    user::report();
+
+    let outcome = match user::start(&mut mapper) {
+        Ok(outcome) => outcome,
+        Err(err) => panic!("user: could not start the user program: {:?}", err),
+    };
+
+    user::report_outcome(outcome);
+
+    unsafe {
+        serial::write_str("Elvaris kernel: user: syscalls=");
+        serial::write_fmt(core::format_args!("{}", user::session::syscall_count()));
+        serial::write_newline();
+    }
+
+    // The self test of the user-mode subsystem: two probes that do something
+    // the kernel has to refuse. The kernel has to survive both of them.
+    if let Err(err) = user::self_test() {
+        panic!("user: the self test failed: {:?}", err);
+    }
+
+    unsafe {
+        serial::write_str("Elvaris kernel: --- end user ---\r\n");
+
+        serial::write_str("Elvaris kernel: pmm: allocated_frames=");
+        serial::write_fmt(core::format_args!("{}", pmm.allocated_frames()));
+        serial::write_str(" free_frames=");
+        serial::write_fmt(core::format_args!("{}", pmm.free_frames()));
+        serial::write_newline();
     }
 
     // Signal successful boot to the host via the QEMU debugcon device, then

@@ -136,6 +136,8 @@ define_stubs! {
     (46, "push 0\n"),
     (47, "push 0\n"),
     // The kernel timer.
+    (64, "push 0\n"),
+    // The system call of the user mode.
     (128, "push 0\n"),
     // The spurious interrupt of the local APIC.
     (255, "push 0\n"),
@@ -190,6 +192,7 @@ unsafe extern "C" {
     fn isr_stub_45();
     fn isr_stub_46();
     fn isr_stub_47();
+    fn isr_stub_64();
     fn isr_stub_128();
     fn isr_stub_255();
 }
@@ -251,7 +254,10 @@ pub static HARDWARE_STUBS: [unsafe extern "C" fn(); 16] = [
 ];
 
 /// The stub of the kernel timer.
-pub static TIMER_STUB: unsafe extern "C" fn() = isr_stub_128;
+pub static TIMER_STUB: unsafe extern "C" fn() = isr_stub_64;
+
+/// The stub of the system call of the user mode.
+pub static SYSCALL_STUB: unsafe extern "C" fn() = isr_stub_128;
 
 /// The stub of the spurious interrupt of the local APIC.
 pub static SPURIOUS_STUB: unsafe extern "C" fn() = isr_stub_255;
@@ -261,13 +267,23 @@ pub static SPURIOUS_STUB: unsafe extern "C" fn() = isr_stub_255;
 /// The handler dispatches on the vector. Fatal exceptions do not return; the
 /// timer tick and the hardware interrupts return, and the stub restores the
 /// interrupted state.
+///
+/// The system call is the one event a user program can raise. It returns to
+/// the user program like an ordinary interrupt does, unless the program
+/// ended, in which case the handler resumes the kernel instead.
 #[unsafe(no_mangle)]
 pub extern "C" fn elvaris_exception_entry(frame: *mut InterruptFrame) {
-    let frame = unsafe { &*frame };
+    // SAFETY: the stub passes a pointer to the frame it built on the
+    // interrupt stack. The handler may write the return value of a system
+    // call back into it; the stub restores the registers from the same
+    // memory.
+    let frame = unsafe { &mut *frame };
     let vector = frame.vector();
 
     if is_exception(vector) {
         fatal_exception(frame, vector);
+    } else if vector == crate::cpu::vectors::SYSCALL_VECTOR {
+        crate::user::syscall::handle(frame);
     } else if is_hardware_interrupt(vector) {
         crate::cpu::pic::handle_hardware_interrupt(
             vector - crate::cpu::vectors::HARDWARE_VECTOR_BASE,
@@ -298,6 +314,12 @@ struct ExceptionReport {
 /// Report a fatal CPU exception and terminate the machine.
 fn fatal_exception(frame: &InterruptFrame, vector: u8) -> ! {
     if frame.from_user_mode() {
+        if crate::user::session::is_active() {
+            // The exception came from the user program. It does not take the
+            // kernel down: the user program is terminated instead, and the
+            // kernel resumes where it left user mode.
+            crate::user::session::handle_fault(frame, vector);
+        }
         report_user_mode_exception(frame, vector);
     }
 
@@ -326,12 +348,13 @@ fn fatal_exception(frame: &InterruptFrame, vector: u8) -> ! {
     terminate()
 }
 
-/// Report an exception that arrived from user mode.
+/// Report an exception that arrived from user mode without a user program.
 ///
-/// The kernel does not run user code yet, so such an exception means that
-/// something in the kernel switched the privilege level without preparing for
-/// it. The report says so instead of pretending that the frame belongs to the
-/// kernel.
+/// The kernel runs user code only while a user program is active. An
+/// exception from user mode outside that window means that something in the
+/// kernel switched the privilege level without preparing for it, and the
+/// kernel cannot continue. The report says so instead of pretending that the
+/// frame belongs to the kernel.
 fn report_user_mode_exception(frame: &InterruptFrame, vector: u8) -> ! {
     unsafe {
         serial::write_str("Elvaris kernel: EXCEPTION: Unexpected User Mode Event\r\n");

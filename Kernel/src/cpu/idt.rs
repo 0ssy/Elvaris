@@ -11,7 +11,9 @@
 //! entry that is not present makes the processor raise a "vector not
 //! present" fault, which is handled by the double-fault path.
 
-use crate::cpu::descriptor::{idt_entry, table_descriptor, INTERRUPT_GATE};
+use crate::cpu::descriptor::{
+    idt_entry, idt_entry_with_dpl, table_descriptor, INTERRUPT_GATE,
+};
 use crate::cpu::vectors::IDT_ENTRY_COUNT;
 
 /// The interrupt descriptor table.
@@ -34,6 +36,25 @@ impl Idt {
     /// this vector; zero means "keep the current stack".
     pub fn set_handler(&mut self, vector: u8, handler: u64, selector: u16, ist: u8) {
         self.set_entry(vector, idt_entry(handler, selector, ist, INTERRUPT_GATE));
+    }
+
+    /// Install a handler that user mode may call.
+    ///
+    /// `dpl` is the requested privilege level of the entry. Only an entry
+    /// with a requested privilege level of three can be reached from ring
+    /// three.
+    pub fn set_handler_with_dpl(
+        &mut self,
+        vector: u8,
+        handler: u64,
+        selector: u16,
+        ist: u8,
+        dpl: u8,
+    ) {
+        self.set_entry(
+            vector,
+            idt_entry_with_dpl(handler, selector, ist, INTERRUPT_GATE, dpl),
+        );
     }
 
     /// Install a raw entry.

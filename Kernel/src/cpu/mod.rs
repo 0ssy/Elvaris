@@ -49,6 +49,14 @@ pub const TIMER_FREQUENCY: u32 = 100;
 /// The vector the local APIC timer uses.
 pub const TIMER_VECTOR: u8 = vectors::TIMER_VECTOR;
 
+/// The privilege level of the system-call entry of the interrupt descriptor
+/// table.
+///
+/// The processor only lets a program call an entry whose requested privilege
+/// level is at least as high as the privilege level of the program, so the
+/// system call is the only event a user program can raise.
+pub const USER_PRIVILEGE_LEVEL: u8 = 3;
+
 /// Page-table flags used for the memory mapped device registers.
 ///
 /// The registers are present and writable, and they are never executable.
@@ -107,6 +115,15 @@ pub fn init(kernel_stack_top: u64) -> CpuInit {
         exception::TIMER_STUB as u64,
         exception::handler_selector(),
         0,
+    );
+    // The system call is the only entry user mode may reach: its requested
+    // privilege level is three, while every other entry belongs to ring zero.
+    table.set_handler_with_dpl(
+        vectors::SYSCALL_VECTOR,
+        exception::SYSCALL_STUB as u64,
+        exception::handler_selector(),
+        0,
+        USER_PRIVILEGE_LEVEL,
     );
     table.set_handler(
         apic::SPURIOUS_VECTOR,

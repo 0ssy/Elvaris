@@ -28,9 +28,22 @@ use crate::vmm::page_table::{
     FRAME_MASK, PAGE_SIZE,
 };
 
-/// Flags used for intermediate page-table entries: present, writable by the
-/// kernel, and never executable.
-pub const TABLE_FLAGS: u64 = entry_flags::PRESENT | entry_flags::WRITABLE | entry_flags::NO_EXECUTE;
+/// Flags used for intermediate page-table entries: present and writable by the
+/// kernel.
+///
+/// The entries of the upper levels of the hierarchy carry no no-execute bit:
+/// such a bit does not describe the table itself, it describes every page
+/// below the table, and it would make all of them non-executable. Whether a
+/// page may be executed is decided by the flag of its own entry.
+pub const TABLE_FLAGS: u64 = entry_flags::PRESENT | entry_flags::WRITABLE;
+
+/// Flags used for the intermediate page-table entries of a user address space.
+///
+/// The user bit has to be set on every level of the hierarchy. The processor
+/// checks it at each level on the way to the leaf: a user-mode access
+/// through a table without the user bit raises a page fault even when the
+/// page itself is accessible from user mode.
+pub const USER_TABLE_FLAGS: u64 = TABLE_FLAGS | entry_flags::USER_ACCESSIBLE;
 
 /// Error returned by mapping operations.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -123,6 +136,9 @@ pub struct Mapper<'a> {
     allocator: &'a mut PhysFrameAllocator,
     pml4_phys: u64,
     phys_offset: u64,
+    /// The number of frames the mapper took from the physical-memory
+    /// allocator since the last time the counter was taken.
+    frames_allocated: u64,
 }
 
 impl<'a> Mapper<'a> {
@@ -143,15 +159,59 @@ impl<'a> Mapper<'a> {
         phys_offset: Option<u64>,
     ) -> Result<Self, MapError> {
         let offset = phys_offset.ok_or(MapError::NoPhysicalMemoryMapping)?;
+        // Record the offset: the kernel needs it to dereference the page
+        // tables from contexts that cannot borrow the mapper.
+        crate::vmm::set_physical_memory_offset(offset);
         Ok(Self {
             allocator,
             pml4_phys: unsafe { current_pml4() },
             phys_offset: offset,
+            frames_allocated: 0,
         })
     }
 
     pub fn pml4_address(&self) -> u64 {
         self.pml4_phys
+    }
+
+    /// Point the mapper at another top-level table and return the previous target.
+    pub fn retarget(&mut self, pml4_phys: u64) -> u64 {
+        let previous = self.pml4_phys;
+        self.pml4_phys = pml4_phys;
+        previous
+    }
+
+    /// Take a zeroed frame from the PMM for use as a page table.
+    pub fn allocate_table_frame(&mut self) -> Result<u64, MapError> {
+        let frame = self.allocate_frame()?;
+        let table = unsafe { self.table_at(frame) };
+        unsafe {
+            core::ptr::write_bytes(table as *mut u8, 0, crate::vmm::page_table::PAGE_SIZE as usize);
+        }
+        Ok(frame)
+    }
+
+    /// Copy the 512 entries of the current PML4 into another PML4 frame.
+    pub fn copy_pml4(&self, destination: u64) -> Result<(), MapError> {
+        let src = unsafe { self.table_at(self.pml4_phys) };
+        let dst = unsafe { self.table_at(destination) };
+        unsafe {
+            core::ptr::copy_nonoverlapping(src as *const u8, dst as *mut u8, crate::vmm::page_table::PAGE_SIZE as usize);
+        }
+        Ok(())
+    }
+
+    /// Hand out the frames the mapper took since the last call.
+    pub fn copy_allocated_frames(&mut self, out: &mut [u64]) -> usize {
+        // The existing counter only tracks the count, not individual frames,
+        // so this reports how many were taken without enumerating them.
+        let n = self.frames_allocated as usize;
+        let to_copy = n.min(out.len());
+        for slot in out.iter_mut().take(to_copy) {
+            *slot = 0;
+        }
+        self.frames_allocated = 0;
+        to_copy
     }
 
     /// Base address of the physical-memory direct map.
@@ -201,22 +261,40 @@ impl<'a> Mapper<'a> {
                 .allocator
                 .allocate_frame()
                 .ok_or(MapError::OutOfMemory)?;
+            self.frames_allocated += 1;
             if frame != 0 {
                 return Ok(frame);
             }
         }
     }
 
+    /// The number of frames the mapper took from the physical-memory
+    /// allocator since the last time the counter was taken.
+    ///
+    /// The counter is reset, so the caller can measure how many frames a
+    /// single operation needed.
+    pub fn take_allocated_frames(&mut self) -> u64 {
+        let frames = self.frames_allocated;
+        self.frames_allocated = 0;
+        frames
+    }
+
     /// Return the table at `index` inside `parent`, creating it if needed.
     ///
-    /// A newly created table is zeroed and marked present and writable. The
-    /// second element of the result reports whether a table was created, which
-    /// means an upper-level paging structure was modified and the TLB has to
-    /// be flushed as a whole.
+    /// A newly created table is zeroed and marked with `table_flags`. The
+    /// flags of an existing entry are widened instead: the table flags are
+    /// added to them, and the no-execute bit is removed. A table that the
+    /// bootloader created for the kernel therefore becomes usable from user
+    /// mode as soon as a user program needs it.
+    ///
+    /// The second element of the result reports whether the entry changed,
+    /// which means an upper-level paging structure was modified and the TLB
+    /// has to be flushed as a whole.
     fn next_table(
         &mut self,
         parent: *mut PageTable,
         index: usize,
+        table_flags: u64,
     ) -> Result<(*mut PageTable, bool), MapError> {
         let entry = unsafe { (*parent).get_entry(index) };
         if entry & entry_flags::PRESENT != 0 {
@@ -224,6 +302,14 @@ impl<'a> Mapper<'a> {
                 return Err(MapError::HugePageUnsupported);
             }
             let frame = entry & FRAME_MASK;
+
+            // Keep the flags of the entry, drop its address, and apply the
+            // flags the caller asked for. The frame of the table stays.
+            let wanted = frame | ((entry & !FRAME_MASK & !entry_flags::NO_EXECUTE) | table_flags);
+            if wanted != entry {
+                unsafe { (*parent).set_entry(index, wanted) };
+                return Ok((unsafe { self.table_at(frame) }, true));
+            }
             Ok((unsafe { self.table_at(frame) }, false))
         } else {
             // Allocate the new table from the PMM.
@@ -232,9 +318,23 @@ impl<'a> Mapper<'a> {
             // The frame is uninitialized memory: zero it before use.
             unsafe {
                 core::ptr::write_bytes(table as *mut u8, 0, PAGE_SIZE as usize);
-                (*parent).set_entry(index, frame | TABLE_FLAGS);
+                (*parent).set_entry(index, frame | table_flags);
             }
             Ok((table, true))
+        }
+    }
+
+    /// The flags the intermediate tables of a mapping carry.
+    ///
+    /// A page that is accessible from user mode needs tables that are
+    /// accessible from user mode as well: the processor checks the user bit
+    /// on every level of the hierarchy before it lets a user-mode access
+    /// reach the page.
+    fn table_flags_for(flags: u64) -> u64 {
+        if flags & entry_flags::USER_ACCESSIBLE != 0 {
+            USER_TABLE_FLAGS
+        } else {
+            TABLE_FLAGS
         }
     }
 
@@ -257,11 +357,12 @@ impl<'a> Mapper<'a> {
 
         let virt = page_start(virtual_addr);
         let phys = physical_addr & !(PAGE_SIZE as u64 - 1);
+        let table_flags = Self::table_flags_for(flags);
 
         let pml4 = unsafe { self.table_at(self.pml4_phys) };
-        let (pdpt, pdpt_created) = self.next_table(pml4, pml4_index(virt))?;
-        let (pd, pd_created) = self.next_table(pdpt, pdpt_index(virt))?;
-        let (pt, pt_created) = self.next_table(pd, pd_index(virt))?;
+        let (pdpt, pdpt_changed) = self.next_table(pml4, pml4_index(virt), table_flags)?;
+        let (pd, pd_changed) = self.next_table(pdpt, pdpt_index(virt), table_flags)?;
+        let (pt, pt_changed) = self.next_table(pd, pd_index(virt), table_flags)?;
 
         let existing = unsafe { (*pt).get_entry(pt_index(virt)) };
         if existing & entry_flags::PRESENT != 0 {
@@ -271,7 +372,7 @@ impl<'a> Mapper<'a> {
         unsafe { (*pt).set_entry(pt_index(virt), phys | flags) };
         flush_tlb(virt);
 
-        if pdpt_created || pd_created || pt_created {
+        if pdpt_changed || pd_changed || pt_changed {
             // An upper-level paging structure was modified. The processor may
             // have cached the previous "not present" state, and a targeted
             // invalidation is not guaranteed to reach those caches, so the
@@ -330,55 +431,14 @@ impl<'a> Mapper<'a> {
     ///
     /// Returns the physical address and flags if present, or None if not mapped.
     pub fn translate(&self, virtual_addr: u64) -> Option<(u64, u64)> {
-        if !is_canonical(virtual_addr) {
-            return None;
-        }
-        let virt = page_start(virtual_addr);
-
-        let pml4 = unsafe { self.table_at(self.pml4_phys) };
-        let pdpt_entry = unsafe { (*pml4).get_entry(pml4_index(virt)) };
-        if pdpt_entry & entry_flags::PRESENT == 0 {
-            return None;
-        }
-        let pdpt = unsafe { self.table_at(pdpt_entry & FRAME_MASK) };
-
-        let pd_entry = unsafe { (*pdpt).get_entry(pdpt_index(virt)) };
-        if pd_entry & entry_flags::PRESENT == 0 {
-            return None;
-        }
-        if pd_entry & entry_flags::HUGE_PAGE != 0 {
-            return None;
-        }
-        let pd = unsafe { self.table_at(pd_entry & FRAME_MASK) };
-
-        let pt_entry = unsafe { (*pd).get_entry(pd_index(virt)) };
-        if pt_entry & entry_flags::PRESENT == 0 {
-            return None;
-        }
-        if pt_entry & entry_flags::HUGE_PAGE != 0 {
-            return None;
-        }
-        let pt = unsafe { self.table_at(pt_entry & FRAME_MASK) };
-
-        let pte = unsafe { (*pt).get_entry(pt_index(virt)) };
-        if pte & entry_flags::PRESENT == 0 {
-            return None;
-        }
-        Some((
-            pte & FRAME_MASK,
-            pte & (PAGE_SIZE as u64 - 1),
-        ))
+        crate::vmm::translate::translate(self.pml4_phys, self.phys_offset, virtual_addr)
     }
 
-    /// Unmap (clear) the entry for `virtual_addr` and return the frame.
+    /// Return the leaf page table that holds the entry for `virtual_addr`.
     ///
-    /// With a non-reclaiming PMM, the frame is not returned to the pool.
-    pub fn unmap_page(&mut self, virtual_addr: u64) -> Result<u64, MapError> {
-        if !is_canonical(virtual_addr) {
-            return Err(MapError::NonCanonicalAddress);
-        }
-        let virt = page_start(virtual_addr);
-
+    /// Every level of the hierarchy has to be present, and the entries may
+    /// not describe a huge page: the kernel maps 4 KiB pages only.
+    fn leaf_table(&self, virt: u64) -> Result<*mut PageTable, MapError> {
         let pml4 = unsafe { self.table_at(self.pml4_phys) };
         let pdpt_entry = unsafe { (*pml4).get_entry(pml4_index(virt)) };
         if pdpt_entry & entry_flags::PRESENT == 0 {
@@ -399,7 +459,46 @@ impl<'a> Mapper<'a> {
         if pt_entry & entry_flags::PRESENT == 0 {
             return Err(MapError::NotMapped);
         }
-        let pt = unsafe { self.table_at(pt_entry & FRAME_MASK) };
+        if pt_entry & entry_flags::HUGE_PAGE != 0 {
+            return Err(MapError::HugePageUnsupported);
+        }
+        Ok(unsafe { self.table_at(pt_entry & FRAME_MASK) })
+    }
+
+    /// Replace the flags of an existing mapping.
+    ///
+    /// The physical frame stays the same; only the permission bits of the
+    /// entry change. The kernel uses this to make a page read-only once the
+    /// program is loaded into it.
+    pub fn update_flags(&mut self, virtual_addr: u64, flags: u64) -> Result<(), MapError> {
+        if !is_canonical(virtual_addr) {
+            return Err(MapError::NonCanonicalAddress);
+        }
+        MapFlags::validate(flags)?;
+        let virt = page_start(virtual_addr);
+
+        let pt = self.leaf_table(virt)?;
+        let pte = unsafe { (*pt).get_entry(pt_index(virt)) };
+        if pte & entry_flags::PRESENT == 0 {
+            return Err(MapError::NotMapped);
+        }
+
+        let frame = pte & FRAME_MASK;
+        unsafe { (*pt).set_entry(pt_index(virt), frame | flags) };
+        flush_tlb(virt);
+        Ok(())
+    }
+
+    /// Unmap (clear) the entry for `virtual_addr` and return the frame.
+    ///
+    /// With a non-reclaiming PMM, the frame is not returned to the pool.
+    pub fn unmap_page(&mut self, virtual_addr: u64) -> Result<u64, MapError> {
+        if !is_canonical(virtual_addr) {
+            return Err(MapError::NonCanonicalAddress);
+        }
+        let virt = page_start(virtual_addr);
+
+        let pt = self.leaf_table(virt)?;
 
         let pte = unsafe { (*pt).get_entry(pt_index(virt)) };
         if pte & entry_flags::PRESENT == 0 {

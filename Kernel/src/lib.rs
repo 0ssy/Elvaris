@@ -17,6 +17,9 @@ pub mod heap;
 
 pub mod cpu;
 
+pub mod user;
+pub mod process;
+
 #[cfg(any(test, feature = "alloc"))]
 pub mod threads;
 

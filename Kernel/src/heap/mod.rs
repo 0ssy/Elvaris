@@ -294,6 +294,40 @@ impl<T> Drop for SpinLockGuard<'_, T> {
     }
 }
 
+/// The global allocator of the kernel.
+///
+/// The kernel heap is the only allocator the kernel has, so the global
+/// allocator forwards every request to it. The heap has to be initialized
+/// before the first allocation: an allocation before that is a programming
+/// error, and the allocator reports it instead of returning a bogus pointer.
+///
+/// The arena never allocates on its own, so the global allocator cannot
+/// recurse into itself.
+pub struct KernelGlobalAlloc;
+
+// SAFETY: the heap serializes access to its blocks with a spin lock, so the
+// allocator is safe to use from several contexts.
+unsafe impl core::alloc::GlobalAlloc for KernelGlobalAlloc {
+    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+        match alloc(layout.size(), layout.align()) {
+            Ok(ptr) => ptr.as_ptr(),
+            // The kernel cannot continue without memory: an allocation that
+            // fails is a fatal condition, and the panic handler reports it.
+            Err(_) => panic!("heap: global allocation failed"),
+        }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+        let Some(ptr) = core::ptr::NonNull::new(ptr) else {
+            return;
+        };
+        // A failed deallocation means the block was corrupted. There is
+        // nothing the caller could do about it, and the kernel does not
+        // pretend that the block was released.
+        let _ = dealloc(ptr, layout.size());
+    }
+}
+
 /// The single kernel heap instance.
 static HEAP: SpinLock<Option<KernelHeap>> = SpinLock::new(None);
 

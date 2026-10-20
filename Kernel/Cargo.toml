@@ -34,6 +34,10 @@ path = "tests/boot.rs"
 name = "heap"
 path = "tests/heap.rs"
 
+[[test]]
+name = "user"
+path = "tests/user.rs"
+
 # `panic = "abort"` is defined at the workspace root (see ../Cargo.toml).
 # Profiles in non-root packages are silently ignored by Cargo, so we keep
 # them out of this file to avoid confusion.

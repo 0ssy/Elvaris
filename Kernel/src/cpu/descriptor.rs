@@ -120,13 +120,30 @@ pub const fn tss_descriptor(base: u64, limit: u32) -> u128 {
 /// = the dedicated stack of the task state segment). `gate` is
 /// [`INTERRUPT_GATE`] or [`TRAP_GATE`].
 pub const fn idt_entry(offset: u64, selector: u16, ist: u8, gate: u8) -> u128 {
-    // Present, DPL 0, 64-bit gate.
-    let type_attributes = 0x80 | (gate & 0xF);
+    idt_entry_with_dpl(offset, selector, ist, gate, 0)
+}
+
+/// Encode an interrupt descriptor table entry that user mode may call.
+///
+/// `dpl` is the requested privilege level of the entry. The processor only
+/// lets a program call an entry whose requested privilege level is at least
+/// as high as the privilege level of the program, so an entry with a
+/// requested privilege level of three is the only kind of entry a user
+/// program can reach.
+pub const fn idt_entry_with_dpl(
+    offset: u64,
+    selector: u16,
+    ist: u8,
+    gate: u8,
+    dpl: u8,
+) -> u128 {
+    // Present, the requested privilege level, 64-bit gate.
+    let type_attributes = 0x80 | (((dpl as u128) & 0x3) << 5) | ((gate as u128) & 0xF);
     let offset = offset as u128;
     (offset & 0xFFFF)
         | ((selector as u128) << 16)
         | (((ist as u128) & 0x7) << 32)
-        | ((type_attributes as u128) << 40)
+        | (type_attributes << 40)
         | (((offset >> 16) & 0xFFFF) << 48)
         | (((offset >> 32) & 0xFFFF_FFFF) << 64)
 }

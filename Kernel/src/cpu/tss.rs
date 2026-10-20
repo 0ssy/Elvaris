@@ -147,6 +147,23 @@ pub fn kernel_stack_top() -> u64 {
     unsafe { (*core::ptr::addr_of!(TSS)).0.privilege_stack_table[0] }
 }
 
+/// Set the stack the processor switches to when an event arrives from user
+/// mode.
+///
+/// The processor loads the stack pointer of ring zero from the task state
+/// segment whenever an interrupt or an exception crosses a privilege level.
+/// The stack belongs to the kernel: the user program never touches it, and
+/// the kernel can rely on it while it handles an event from user mode.
+///
+/// The kernel calls this before it enters user mode, so that the events of a
+/// user program never reach the stack the kernel itself runs on.
+pub fn set_privilege_stack(top: u64) {
+    // SAFETY: the task state segment belongs to the kernel and is only
+    // changed while no user program is running.
+    let tss = unsafe { &mut *core::ptr::addr_of_mut!(TSS) };
+    tss.0.privilege_stack_table[0] = top;
+}
+
 /// The selector the task register currently holds.
 ///
 /// The processor does not expose the base of the task state segment directly;
