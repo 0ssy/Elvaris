@@ -7,7 +7,7 @@ description = "Elvaris bare-metal kernel (x86-64, no_std)"
 [features]
 default = []
 bare = []
-
+alloc = []
 [dependencies]
 bootloader_api = "0.11.17"
 x86_64 = "0.15"

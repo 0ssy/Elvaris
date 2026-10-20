@@ -36,7 +36,7 @@ global_asm!(
     "    ret\n",
 );
 
-extern "C" {
+unsafe extern "C" {
     /// Switch from current context to next context.
     /// 
     /// # Safety

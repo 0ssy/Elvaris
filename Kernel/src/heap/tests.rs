@@ -3,6 +3,8 @@
 //! These tests run on the host target. They exercise the allocator logic
 //! only: no paging, no PMM and no kernel environment is involved.
 
+use alloc::vec::Vec;
+
 use super::allocator::{AllocError, Arena, HEADER_ALIGN, HEADER_SIZE, MIN_PAYLOAD};
 
 /// Size of the test arenas. A multiple of the page size keeps the arena
