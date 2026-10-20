@@ -75,6 +75,33 @@ pub unsafe fn write_fmt(args: core::fmt::Arguments<'_>) {
     let _ = writer.write_fmt(args);
 }
 
+/// I/O port of the line status register of COM1.
+const COM1_LINE_STATUS: u16 = 0x3F8 + 5;
+
+/// Bit of the line status register that says a received byte is waiting.
+const LINE_STATUS_DATA_READY: u8 = 0x01;
+
+/// Read a byte from COM1 if one is waiting.
+///
+/// Returns `None` when the receive buffer is empty. The function never
+/// blocks: the caller decides how long it is willing to wait.
+pub fn try_read_byte() -> Option<u8> {
+    // SAFETY: port I/O on the UART of the primary serial console. The
+    // bootloader programmed the port before the kernel started.
+    unsafe {
+        if read_port(COM1_LINE_STATUS) & LINE_STATUS_DATA_READY == 0 {
+            return None;
+        }
+        Some(read_port(COM1_PORT))
+    }
+}
+
+/// The current value of the line status register of COM1.
+pub fn line_status() -> u8 {
+    // SAFETY: port I/O on the UART of the primary serial console.
+    unsafe { read_port(COM1_LINE_STATUS) }
+}
+
 /// Read a byte from an I/O port.
 unsafe fn read_port(port: u16) -> u8 {
     let value: u8;

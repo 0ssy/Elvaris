@@ -2,7 +2,9 @@
 
 #![allow(dead_code)]
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use alloc::string::String;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProcessId(pub u64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,6 +14,19 @@ pub enum ProcessState {
     Running,
     Exited,
     Faulted,
+}
+
+impl ProcessState {
+    /// A short name of the state, used in the process report.
+    pub const fn name(&self) -> &'static str {
+        match self {
+            ProcessState::Created => "created",
+            ProcessState::Runnable => "runnable",
+            ProcessState::Running => "running",
+            ProcessState::Exited => "exited",
+            ProcessState::Faulted => "faulted",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +49,18 @@ pub enum ExitStatus {
     Exited(u64),
     Faulted(FaultInfo),
     Rejected(RejectInfo),
+}
+
+impl ExitStatus {
+    /// A short description of the status, used in the process report.
+    pub const fn name(&self) -> &'static str {
+        match self {
+            ExitStatus::Pending => "pending",
+            ExitStatus::Exited(_) => "exited",
+            ExitStatus::Faulted(_) => "faulted",
+            ExitStatus::Rejected(_) => "rejected",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,10 +120,17 @@ pub struct ProgramDescriptor {
 
 pub const MAX_RESOURCES: usize = 8;
 
-#[derive(Debug, Clone, Copy)]
+/// A process of the machine.
+///
+/// The kernel owns one address space and one user window, so the processes
+/// of this milestone do not run at the same time: a program that starts
+/// another one blocks until the program it started ends. The table records
+/// the processes anyway, because the shell has to report them.
+#[derive(Debug, Clone)]
 pub struct Process {
     pub id: ProcessId,
-    pub name: &'static str,
+    /// The path of the program of the process.
+    pub name: String,
     pub parent: Option<ProcessId>,
     pub security: SecurityIdentity,
     pub state: ProcessState,
@@ -114,9 +148,11 @@ impl Process {
     pub fn set_runnable(&mut self) {
         self.state = ProcessState::Runnable;
     }
+
     pub fn set_running(&mut self) {
         self.state = ProcessState::Running;
     }
+
     pub fn finish(&mut self, status: ExitStatus) {
         self.status = status;
         self.state = match status {
@@ -125,6 +161,14 @@ impl Process {
             ExitStatus::Rejected(_) => ProcessState::Faulted,
             ExitStatus::Pending => ProcessState::Exited,
         };
+    }
+
+    /// The exit code of the process, if it ended normally.
+    pub const fn exit_code(&self) -> Option<u64> {
+        match self.status {
+            ExitStatus::Exited(code) => Some(code),
+            _ => None,
+        }
     }
 }
 

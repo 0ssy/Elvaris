@@ -1,16 +1,34 @@
 //! User mode.
 //!
-//! This milestone starts exactly one user program: the kernel creates an
-//! address space for it, loads a fixed image into it, enters ring 3, and
-//! takes the program down again when it ends.
+//! The kernel owns one user window: one code page, one data page and four
+//! stack pages. The window holds exactly one program at a time, and a
+//! program that starts another one saves the window first, so that the
+//! caller finds itself exactly where it was when the program it started
+//! ended.
 //!
-//! The kernel keeps ownership of the program for its whole lifetime. The
+//! The kernel keeps ownership of the window for its whole lifetime. A
 //! program never owns memory the kernel cannot take back, and every pointer
 //! it hands to the kernel is validated before the kernel uses it.
+//!
+//! # The userland
+//!
+//! The userland of this milestone is three programs:
+//!
+//! - `/init` is the first program of the machine. It starts the shell and
+//!   ends with the code the shell ended with.
+//! - `/bin/sh` is the shell. It reads the commands of the person at the
+//!   console and runs them.
+//! - `/bin/hello` is a program of the filesystem, and the shell starts it
+//!   like any other program.
 
 pub mod address;
+pub mod argv;
+pub mod exec;
+pub mod image;
+pub mod loader;
 pub mod pointer;
 pub mod program;
+pub mod programs;
 pub mod session;
 pub mod syscall;
 
@@ -18,10 +36,13 @@ pub mod syscall;
 mod tests;
 
 use crate::serial;
-use crate::user::address::{UserRegion, REGIONS, USER_CODE_FLAGS, USER_DATA_FLAGS, USER_STACK_TOP};
+use crate::user::address::{REGIONS, USER_CODE_FLAGS, USER_DATA_FLAGS, USER_STACK_TOP, UserRegion};
 use crate::user::session::Outcome;
 use crate::vmm::mapper::{MapError, Mapper};
 use crate::vmm::page_table::PAGE_SIZE;
+
+/// The program the kernel starts when the machine boots.
+pub const INIT_PROGRAM: &str = "/init";
 
 /// The size of the stack the processor switches to when an event arrives from
 /// user mode.
@@ -33,10 +54,9 @@ pub const USER_INTERRUPT_STACK_SIZE: usize = 64 * 1024;
 /// Page-table flags the user code page is mapped with while the program is
 /// loaded. The page has to be writable for the kernel to put the program
 /// into it.
-pub const USER_CODE_WRITE_FLAGS: u64 =
-    crate::vmm::page_table::entry_flags::PRESENT
-        | crate::vmm::page_table::entry_flags::WRITABLE
-        | crate::vmm::page_table::entry_flags::USER_ACCESSIBLE;
+pub const USER_CODE_WRITE_FLAGS: u64 = crate::vmm::page_table::entry_flags::PRESENT
+    | crate::vmm::page_table::entry_flags::WRITABLE
+    | crate::vmm::page_table::entry_flags::USER_ACCESSIBLE;
 
 /// Errors of the user-mode setup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,6 +67,8 @@ pub enum UserError {
     OutOfMemory,
     /// The user program does not fit into the user code page.
     ProgramTooLarge,
+    /// The first program of the machine is not in the filesystem.
+    ProgramNotFound,
     /// The self test of the user-mode subsystem did not behave as documented.
     SelfTestFailed,
 }
@@ -63,7 +85,8 @@ impl From<MapError> for UserError {
 /// The block stays allocated for as long as the kernel runs: the task state
 /// segment points at it for the whole lifetime of the user program.
 pub fn allocate_interrupt_stack() -> Result<u64, UserError> {
-    let block = crate::heap::alloc(USER_INTERRUPT_STACK_SIZE, 16).map_err(|_| UserError::OutOfMemory)?;
+    let block =
+        crate::heap::alloc(USER_INTERRUPT_STACK_SIZE, 16).map_err(|_| UserError::OutOfMemory)?;
     Ok(block.as_ptr() as u64 + USER_INTERRUPT_STACK_SIZE as u64)
 }
 
@@ -135,6 +158,8 @@ pub fn start(mapper: &mut Mapper) -> Result<Outcome, UserError> {
         USER_STACK_TOP,
         address::USER_DATA_BASE,
         program::MESSAGE.len() as u64,
+        0,
+        0,
     );
     unsafe {
         serial::write_str("Elvaris kernel: user: the user program ended\r\n");
@@ -143,11 +168,95 @@ pub fn start(mapper: &mut Mapper) -> Result<Outcome, UserError> {
     Ok(outcome)
 }
 
+/// Run the userland of the machine.
+///
+/// The kernel reads the first program out of the filesystem and runs it. The
+/// program starts the shell, and the shell starts the programs the person
+/// at the console asks for.
+///
+/// The filesystem is released before the program runs: the program uses the
+/// filesystem itself, and the lock of the filesystem is not recursive.
+pub fn start_userland() -> Result<Outcome, UserError> {
+    let prepared = {
+        let result = crate::storage::with_filesystem(|fs| exec::prepare(fs, INIT_PROGRAM, ""));
+        match result {
+            Ok(Ok(program)) => program,
+            Ok(Err(error)) => {
+                unsafe {
+                    serial::write_str(
+                        "Elvaris kernel: user: the first program could not be read: ",
+                    );
+                    serial::write_str(exec::load_error_description(error));
+                    serial::write_newline();
+                }
+                return Err(UserError::ProgramNotFound);
+            }
+            Err(_) => return Err(UserError::ProgramNotFound),
+        }
+    };
+
+    unsafe {
+        serial::write_str("Elvaris kernel: user: starting the userland: program=");
+        serial::write_str(INIT_PROGRAM);
+        serial::write_newline();
+    }
+
+    let pid = crate::process::register(INIT_PROGRAM, None, 0);
+    crate::process::set_running(pid);
+
+    let result = exec::run(&prepared);
+    match result {
+        Ok(result) => {
+            crate::process::finish(pid, exit_status(result.outcome));
+            unsafe {
+                serial::write_str("Elvaris kernel: user: the userland ended: outcome=");
+                serial::write_fmt(core::format_args!("{:?}", result.outcome));
+                serial::write_str(" syscalls=");
+                serial::write_fmt(core::format_args!("{}", result.syscalls));
+                serial::write_newline();
+            }
+            Ok(result.outcome)
+        }
+        Err(error) => {
+            crate::process::finish(pid, crate::process::ExitStatus::Pending);
+            unsafe {
+                serial::write_str("Elvaris kernel: user: the userland could not run: ");
+                serial::write_str(exec::load_error_description(error));
+                serial::write_newline();
+            }
+            Err(UserError::ProgramNotFound)
+        }
+    }
+}
+
+/// The exit status of a program that ended.
+fn exit_status(outcome: Outcome) -> crate::process::ExitStatus {
+    match outcome {
+        Outcome::Exited(code) => crate::process::ExitStatus::Exited(code),
+        Outcome::Faulted(vector) => {
+            crate::process::ExitStatus::Faulted(crate::process::process::FaultInfo {
+                vector,
+                error_code: 0,
+                fault_address: 0,
+                rip: 0,
+                rsp: 0,
+            })
+        }
+        Outcome::Rejected(reason) => {
+            crate::process::ExitStatus::Rejected(crate::process::process::RejectInfo { reason })
+        }
+        Outcome::Running => crate::process::ExitStatus::Pending,
+    }
+}
+
 /// Report the layout of the user address space.
 pub fn report() {
     unsafe {
         serial::write_str("Elvaris kernel: user: address space: start=0x");
-        serial::write_fmt(core::format_args!("{:x}", address::USER_ADDRESS_SPACE_START));
+        serial::write_fmt(core::format_args!(
+            "{:x}",
+            address::USER_ADDRESS_SPACE_START
+        ));
         serial::write_str(" end=0x");
         serial::write_fmt(core::format_args!("{:x}", address::USER_ADDRESS_SPACE_END));
         serial::write_newline();
@@ -202,13 +311,13 @@ pub fn self_test() -> Result<(), UserError> {
         USER_STACK_TOP,
         address::USER_DATA_BASE,
         program::MESSAGE.len() as u64,
+        0,
+        0,
     );
     match outcome {
-        Outcome::Faulted(vector) if vector == crate::cpu::vectors::vector::PAGE_FAULT => {
-            unsafe {
-                serial::write_str("Elvaris kernel: user: self_test: fault probe ok\r\n");
-            }
-        }
+        Outcome::Faulted(vector) if vector == crate::cpu::vectors::vector::PAGE_FAULT => unsafe {
+            serial::write_str("Elvaris kernel: user: self_test: fault probe ok\r\n");
+        },
         _ => {
             unsafe {
                 serial::write_str("Elvaris kernel: user: self_test: fault probe failed\r\n");
@@ -225,13 +334,13 @@ pub fn self_test() -> Result<(), UserError> {
         USER_STACK_TOP,
         address::USER_DATA_BASE,
         program::MESSAGE.len() as u64,
+        0,
+        0,
     );
     match outcome {
-        Outcome::Rejected(number) if number == program::unknown_syscall_number() => {
-            unsafe {
-                serial::write_str("Elvaris kernel: user: self_test: unknown syscall probe ok\r\n");
-            }
-        }
+        Outcome::Rejected(number) if number == program::unknown_syscall_number() => unsafe {
+            serial::write_str("Elvaris kernel: user: self_test: unknown syscall probe ok\r\n");
+        },
         _ => {
             unsafe {
                 serial::write_str(

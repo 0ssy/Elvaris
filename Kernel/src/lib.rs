@@ -1,15 +1,19 @@
 //! Kernel library (host-side tests only).
+//!
+//! The library exposes the kernel modules to the host test build. The bare
+//! kernel binary has its own module tree in `main.rs`; the two have to stay
+//! in step, because the modules that are gated here are compiled into the
+//! binary without the gate.
 
 #![cfg_attr(not(test), no_std)]
 
-#[cfg(any(test, feature = "alloc"))]
 extern crate alloc;
 
-pub mod serial;
-pub mod pmm;
 pub mod bootinfo;
-pub mod memory;
 pub mod exit;
+pub mod memory;
+pub mod pmm;
+pub mod serial;
 
 pub mod vmm;
 
@@ -17,16 +21,16 @@ pub mod heap;
 
 pub mod cpu;
 
-pub mod user;
 pub mod process;
+pub mod user;
+
+pub mod console;
+pub mod storage;
+pub mod sysinfo;
 
 #[cfg(any(test, feature = "alloc"))]
 pub mod threads;
 
-
-
-#[cfg(any(test, feature = "alloc"))]
 pub mod block;
 
-#[cfg(any(test, feature = "alloc"))]
 pub mod fs;

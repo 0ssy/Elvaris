@@ -24,8 +24,8 @@
 use crate::pmm::phys_alloc::PhysFrameAllocator;
 use crate::vmm::page_table::entry_flags;
 use crate::vmm::page_table::{
-    current_pml4, is_canonical, page_start, pd_index, pdpt_index, pml4_index, pt_index, PageTable,
-    FRAME_MASK, PAGE_SIZE,
+    FRAME_MASK, PAGE_SIZE, PageTable, current_pml4, is_canonical, page_start, pd_index, pdpt_index,
+    pml4_index, pt_index,
 };
 
 /// Flags used for intermediate page-table entries: present and writable by the
@@ -72,8 +72,7 @@ pub enum MapError {
 pub struct MapFlags(u64);
 
 impl MapFlags {
-    pub const KERNEL_CODE: u64 =
-        entry_flags::PRESENT | entry_flags::NO_EXECUTE | 0; // writable=false, user=false
+    pub const KERNEL_CODE: u64 = entry_flags::PRESENT | entry_flags::NO_EXECUTE | 0; // writable=false, user=false
     pub const KERNEL_DATA: u64 = entry_flags::PRESENT | entry_flags::WRITABLE;
     pub const USER_READ_ONLY: u64 = entry_flags::PRESENT | entry_flags::USER_ACCESSIBLE;
     pub const USER_READ_WRITE: u64 =
@@ -186,7 +185,11 @@ impl<'a> Mapper<'a> {
         let frame = self.allocate_frame()?;
         let table = unsafe { self.table_at(frame) };
         unsafe {
-            core::ptr::write_bytes(table as *mut u8, 0, crate::vmm::page_table::PAGE_SIZE as usize);
+            core::ptr::write_bytes(
+                table as *mut u8,
+                0,
+                crate::vmm::page_table::PAGE_SIZE as usize,
+            );
         }
         Ok(frame)
     }
@@ -196,7 +199,11 @@ impl<'a> Mapper<'a> {
         let src = unsafe { self.table_at(self.pml4_phys) };
         let dst = unsafe { self.table_at(destination) };
         unsafe {
-            core::ptr::copy_nonoverlapping(src as *const u8, dst as *mut u8, crate::vmm::page_table::PAGE_SIZE as usize);
+            core::ptr::copy_nonoverlapping(
+                src as *const u8,
+                dst as *mut u8,
+                crate::vmm::page_table::PAGE_SIZE as usize,
+            );
         }
         Ok(())
     }
@@ -510,6 +517,71 @@ impl<'a> Mapper<'a> {
         flush_tlb(virt);
         Ok(frame)
     }
+}
+
+/// Replace the flags of an existing mapping in the active address space.
+///
+/// The function is the counterpart of [`Mapper::update_flags`] for the
+/// contexts that cannot borrow the mapper. The mapper borrows the physical
+/// memory allocator, and the allocator is not reachable from an interrupt
+/// handler or from a system call. Changing the permission bits of a mapping
+/// needs neither the allocator nor a new frame, so the kernel can do it
+/// without the mapper at all.
+///
+/// The function only changes the leaf entry of the active address space. The
+/// intermediate tables keep the permissions they have, which is enough for
+/// the user window: the kernel maps it with the user bit set on every level.
+pub fn update_flags_current(virtual_addr: u64, flags: u64) -> Result<(), MapError> {
+    let offset = crate::vmm::physical_memory_offset();
+    if offset == 0 {
+        return Err(MapError::NoPhysicalMemoryMapping);
+    }
+    if !is_canonical(virtual_addr) {
+        return Err(MapError::NonCanonicalAddress);
+    }
+    MapFlags::validate(flags)?;
+
+    let virt = page_start(virtual_addr);
+    let table_at = |phys: u64| (phys.wrapping_add(offset)) as *mut PageTable;
+
+    // SAFETY: the direct map is present in the active address space, so the
+    // page tables of that address space are reachable.
+    let pml4_phys = unsafe { current_pml4() };
+    let pml4 = table_at(pml4_phys);
+
+    let pdpt_entry = unsafe { (*pml4).get_entry(pml4_index(virt)) };
+    if pdpt_entry & entry_flags::PRESENT == 0 {
+        return Err(MapError::NotMapped);
+    }
+    let pdpt = table_at(pdpt_entry & FRAME_MASK);
+
+    let pd_entry = unsafe { (*pdpt).get_entry(pdpt_index(virt)) };
+    if pd_entry & entry_flags::PRESENT == 0 {
+        return Err(MapError::NotMapped);
+    }
+    if pd_entry & entry_flags::HUGE_PAGE != 0 {
+        return Err(MapError::HugePageUnsupported);
+    }
+    let pd = table_at(pd_entry & FRAME_MASK);
+
+    let pt_entry = unsafe { (*pd).get_entry(pd_index(virt)) };
+    if pt_entry & entry_flags::PRESENT == 0 {
+        return Err(MapError::NotMapped);
+    }
+    if pt_entry & entry_flags::HUGE_PAGE != 0 {
+        return Err(MapError::HugePageUnsupported);
+    }
+    let pt = table_at(pt_entry & FRAME_MASK);
+
+    let pte = unsafe { (*pt).get_entry(pt_index(virt)) };
+    if pte & entry_flags::PRESENT == 0 {
+        return Err(MapError::NotMapped);
+    }
+
+    let frame = pte & FRAME_MASK;
+    unsafe { (*pt).set_entry(pt_index(virt), frame | flags) };
+    flush_tlb(virt);
+    Ok(())
 }
 
 /// Invalidate the TLB entry for a virtual address.

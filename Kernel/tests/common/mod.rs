@@ -4,8 +4,17 @@
 //! QEMU, and capture the complete serial output. Capturing the output
 //! completely matters: a test that only sees part of the log cannot tell a
 //! missing marker from a marker that was cut off by the end of the pipe.
+//!
+//! # The serial console
+//!
+//! The serial console of the guest is a TCP socket, and the test is the
+//! client of that socket. The kernel hands the console of the userland to
+//! the shell, and the shell waits for the person at the keyboard, so a test
+//! that wants the machine to stop has to tell the shell to stop. The socket
+//! is also the way the test checks what the shell answered.
 
-use std::io::Read;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant, SystemTime};
@@ -19,6 +28,9 @@ pub const TIMEOUT: Duration = Duration::from_secs(60);
 /// `(byte << 1) | 1`, so the success code `0x10` becomes 33.
 pub const EXPECTED_EXIT_CODE: i32 = 33;
 
+/// The prompt the shell shows when it waits for a command.
+pub const SHELL_PROMPT: &str = "sh> ";
+
 /// Everything the test needs to know about a QEMU run.
 pub struct QemuOutput {
     /// Host exit code of QEMU, or -1 if QEMU was killed or timed out.
@@ -27,6 +39,8 @@ pub struct QemuOutput {
     pub stdout: String,
     /// Complete standard error output of QEMU.
     pub stderr: String,
+    /// The output of the debug console of the machine.
+    pub debug: String,
 }
 
 impl QemuOutput {
@@ -38,8 +52,8 @@ impl QemuOutput {
     /// A human-readable dump of the run, used in assertion messages.
     pub fn describe(&self) -> String {
         format!(
-            "exit code: {}\n--- serial output ---\n{}\n--- qemu stderr ---\n{}",
-            self.exit_code, self.stdout, self.stderr
+            "exit code: {}\n--- serial output ---\n{}\n--- debug console ---\n{}\n--- qemu stderr ---\n{}",
+            self.exit_code, self.stdout, self.debug, self.stderr
         )
     }
 }
@@ -170,7 +184,23 @@ fn find_on_path(program: &str) -> Option<PathBuf> {
 /// The output is drained by dedicated threads, so no serial output is lost
 /// when the guest terminates the emulator.
 pub fn run_qemu(image: &Path) -> std::io::Result<QemuOutput> {
+    run_qemu_session(image, &[])
+}
+
+/// Launch QEMU, drive the shell of the guest, and capture the output.
+///
+/// The commands are sent to the shell of the guest one after the other: the
+/// test waits for the prompt of the shell before it sends the next command,
+/// so the answer of a command is never mixed with the answer of the next
+/// one. The shell is told to stop at the end, so that the machine ends the
+/// boot on its own and QEMU reports the exit code of the guest.
+pub fn run_qemu_session(image: &Path, commands: &[&str]) -> std::io::Result<QemuOutput> {
     let (ovmf_code, ovmf_vars) = ovmf_files();
+
+    // The test owns the port of the serial console, so that the guest
+    // connects to a socket that is already there.
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let port = listener.local_addr()?.port();
 
     let mut child: Child = Command::new(qemu_program())
         .args([
@@ -179,6 +209,8 @@ pub fn run_qemu(image: &Path) -> std::io::Result<QemuOutput> {
             "-m",
             "512",
             "-nographic",
+            "-monitor",
+            "none",
             "-no-reboot",
             "-net",
             "none",
@@ -199,6 +231,8 @@ pub fn run_qemu(image: &Path) -> std::io::Result<QemuOutput> {
             "stdio",
             "-global",
             "isa-debugcon.iobase=0x403",
+            "-serial",
+            &format!("tcp:127.0.0.1:{port}"),
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -208,6 +242,34 @@ pub fn run_qemu(image: &Path) -> std::io::Result<QemuOutput> {
     let stderr = child.stderr.take().expect("stderr was piped");
     let stdout_reader = std::thread::spawn(move || read_to_string(stdout));
     let stderr_reader = std::thread::spawn(move || read_to_string(stderr));
+
+    // The guest connects to the serial console as soon as it starts.
+    listener.set_nonblocking(false)?;
+    let mut console = match listener.accept() {
+        Ok((stream, _)) => stream,
+        Err(error) => {
+            let _ = child.kill();
+            return Err(error);
+        }
+    };
+    console.set_read_timeout(Some(Duration::from_millis(200)))?;
+
+    let mut serial = String::new();
+    // The shell shows its prompt when it waits for a command.
+    let mut prompts = wait_for_prompt(&mut console, &mut serial, 0, &mut child);
+
+    for command in commands {
+        writeln!(console, "{command}")?;
+        console.flush()?;
+        prompts = wait_for_prompt(&mut console, &mut serial, prompts, &mut child);
+    }
+
+    // The shell stops, and with it the machine.
+    if prompts > 0 && child.try_wait().map(|status| status.is_none()).unwrap_or(true) {
+        let _ = writeln!(console, "exit");
+        let _ = console.flush();
+    }
+    drain(&mut console, &mut serial);
 
     let start = Instant::now();
     let mut exit_code = -1;
@@ -229,14 +291,62 @@ pub fn run_qemu(image: &Path) -> std::io::Result<QemuOutput> {
         }
     }
 
-    let stdout = stdout_reader.join().unwrap_or_default();
+    let debug = stdout_reader.join().unwrap_or_default();
     let stderr = stderr_reader.join().unwrap_or_default();
 
     Ok(QemuOutput {
         exit_code,
-        stdout,
+        stdout: serial,
         stderr,
+        debug,
     })
+}
+
+/// Read from the console until the shell shows a new prompt.
+///
+/// The function returns the number of the prompts the shell has shown so
+/// far. The wait also ends when the machine stops: a command that ends the
+/// machine never shows a new prompt.
+fn wait_for_prompt(
+    console: &mut TcpStream,
+    serial: &mut String,
+    seen: usize,
+    child: &mut Child,
+) -> usize {
+    let start = Instant::now();
+    loop {
+        drain(console, serial);
+        let prompts = count_prompts(serial);
+        if prompts > seen {
+            return prompts;
+        }
+        if child.try_wait().ok().flatten().is_some() {
+            return prompts;
+        }
+        if start.elapsed() >= TIMEOUT {
+            return prompts;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// Read whatever the guest has sent, without waiting for more.
+fn drain(console: &mut TcpStream, serial: &mut String) {
+    let mut buffer = [0u8; 4096];
+    loop {
+        match console.read(&mut buffer) {
+            Ok(0) => return,
+            Ok(count) => {
+                serial.push_str(&String::from_utf8_lossy(&buffer[..count]));
+            }
+            Err(_) => return,
+        }
+    }
+}
+
+/// The number of the prompts of the shell in the output.
+fn count_prompts(serial: &str) -> usize {
+    serial.matches(SHELL_PROMPT).count()
 }
 
 fn read_to_string(mut reader: impl Read) -> String {

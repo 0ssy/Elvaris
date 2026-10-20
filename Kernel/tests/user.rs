@@ -12,13 +12,13 @@ use common::{assert_boot_success, find_uefi_image, run_qemu};
 /// Markers the kernel must emit for a working user mode.
 const USER_MARKERS: &[&str] = &[
     // The address space the kernel built for the user program.
-    "Elvaris kernel: user: address space: start=0x1000000 end=0x1006000",
-    "Elvaris kernel: user: region: base=0x1000000 pages=1",
-    "Elvaris kernel: user: region: base=0x1001000 pages=1",
-    "Elvaris kernel: user: region: base=0x1002000 pages=4",
+    "Elvaris kernel: user: address space: start=0x8000000000 end=0x8000006000",
+    "Elvaris kernel: user: region: base=0x8000000000 pages=1",
+    "Elvaris kernel: user: region: base=0x8000001000 pages=1",
+    "Elvaris kernel: user: region: base=0x8000002000 pages=4",
     // The transition into ring 3.
     "Elvaris kernel: user: starting the user program",
-    "Elvaris kernel: user: entry=0x1000000 stack_top=0x1006000",
+    "Elvaris kernel: user: entry=0x8000000000 stack_top=0x8000006000",
     // The output of the user program itself.
     "Hello from user space!",
     // The clean end of the user program.
@@ -46,8 +46,8 @@ const FORBIDDEN_MARKERS: &[&str] = &[
 
 #[test]
 fn the_user_program_runs_writes_and_exits() {
-    let image = find_uefi_image()
-        .expect("uefi.img not found under target/ — build the `os` package first");
+    let image =
+        find_uefi_image().expect("uefi.img not found under target/ — build the `os` package first");
 
     let output = run_qemu(image.as_path()).expect("failed to launch QEMU");
 
@@ -65,8 +65,8 @@ fn the_user_program_runs_writes_and_exits() {
 
 #[test]
 fn the_user_output_comes_before_the_end_of_the_user_section() {
-    let image = find_uefi_image()
-        .expect("uefi.img not found under target/ — build the `os` package first");
+    let image =
+        find_uefi_image().expect("uefi.img not found under target/ — build the `os` package first");
 
     let output = run_qemu(image.as_path()).expect("failed to launch QEMU");
 
@@ -87,7 +87,16 @@ fn the_user_output_comes_before_the_end_of_the_user_section() {
         .find("Elvaris kernel: --- end user ---")
         .expect("the kernel did not close the user section");
 
-    assert!(start < message, "the output has to follow the start of the program");
-    assert!(message < exit, "the exit has to follow the output of the program");
-    assert!(exit < end, "the user section has to be closed after the exit");
+    assert!(
+        start < message,
+        "the output has to follow the start of the program"
+    );
+    assert!(
+        message < exit,
+        "the exit has to follow the output of the program"
+    );
+    assert!(
+        exit < end,
+        "the user section has to be closed after the exit"
+    );
 }

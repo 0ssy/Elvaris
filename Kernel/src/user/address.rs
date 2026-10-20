@@ -18,7 +18,7 @@
 //! space is never mapped, so a null pointer in user code faults instead of
 //! reaching the kernel.
 
-use crate::vmm::page_table::{entry_flags, PAGE_SIZE};
+use crate::vmm::page_table::{PAGE_SIZE, entry_flags};
 
 /// The first address of the user address space.
 pub const USER_ADDRESS_SPACE_START: u64 = 0x0000_0080_0000_0000;

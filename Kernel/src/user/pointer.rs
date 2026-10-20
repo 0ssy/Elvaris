@@ -13,7 +13,7 @@
 //! where the physical-memory direct map makes the tables reachable.
 
 use crate::user::address::{USER_ADDRESS_SPACE_END, USER_ADDRESS_SPACE_START};
-use crate::vmm::page_table::{entry_flags, is_canonical, page_start, PAGE_SIZE};
+use crate::vmm::page_table::{PAGE_SIZE, entry_flags, is_canonical, page_start};
 use crate::vmm::translate;
 
 /// Why a user pointer was rejected.

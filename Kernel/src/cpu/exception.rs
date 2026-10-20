@@ -272,7 +272,7 @@ pub static SPURIOUS_STUB: unsafe extern "C" fn() = isr_stub_255;
 /// the user program like an ordinary interrupt does, unless the program
 /// ended, in which case the handler resumes the kernel instead.
 #[unsafe(no_mangle)]
-pub extern "C" fn elvaris_exception_entry(frame: *mut InterruptFrame) {
+pub unsafe extern "C" fn elvaris_exception_entry(frame: *mut InterruptFrame) {
     // SAFETY: the stub passes a pointer to the frame it built on the
     // interrupt stack. The handler may write the return value of a system
     // call back into it; the stub restores the registers from the same

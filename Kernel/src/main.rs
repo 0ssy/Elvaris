@@ -3,18 +3,23 @@
 
 extern crate alloc;
 
+mod block;
+mod bootinfo;
+mod console;
+mod cpu;
+mod exit;
+mod fs;
+mod heap;
+mod memory;
+mod pmm;
+mod process;
+mod serial;
+mod storage;
+mod sysinfo;
 #[cfg(feature = "bare")]
 mod threads;
-mod pmm;
-mod bootinfo;
-mod memory;
-mod exit;
-mod serial;
-mod vmm;
-mod heap;
-mod cpu;
 mod user;
-mod process;
+mod vmm;
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
@@ -107,6 +112,13 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     if !pmm.init(regions) {
         panic!("pmm: initialization failed");
     }
+    // The kernel keeps the numbers of the physical memory: the shell asks
+    // the kernel for them long after the boot sequence is over.
+    sysinfo::record_frames(
+        pmm.total_frames(),
+        pmm.allocated_frames(),
+        pmm.free_frames(),
+    );
     unsafe {
         serial::write_str("Elvaris kernel: pmm: usable_regions=");
         serial::write_fmt(core::format_args!("{}", pmm.usable_region_count()));
@@ -234,6 +246,15 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         serial::write_str("Elvaris kernel: --- end interrupts ---\r\n");
     }
 
+    // The filesystem of the machine. It holds the programs of the userland,
+    // and it is the only way a user program reaches a file.
+    if let Err(err) = storage::initialize() {
+        panic!("storage: the filesystem could not be created: {:?}", err);
+    }
+    unsafe {
+        serial::write_str("Elvaris kernel: storage: the filesystem is mounted\r\n");
+    }
+
     // User mode: the kernel creates an address space for one user program,
     // loads a fixed image into it, enters ring 3, and takes the program down
     // again when it ends.
@@ -262,7 +283,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     unsafe {
         serial::write_str("Elvaris kernel: user: syscalls=");
-        serial::write_fmt(core::format_args!("{}", user::session::syscall_count()));
+        serial::write_fmt(core::format_args!("{}", user::session::last_syscalls()));
         serial::write_newline();
     }
 
@@ -271,6 +292,14 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     if let Err(err) = user::self_test() {
         panic!("user: the self test failed: {:?}", err);
     }
+
+    // The userland: the first program of the machine starts the shell, and
+    // the shell runs the programs the person at the console asks for.
+    let userland = match user::start_userland() {
+        Ok(outcome) => outcome,
+        Err(err) => panic!("user: the userland could not start: {:?}", err),
+    };
+    user::report_outcome(userland);
 
     unsafe {
         serial::write_str("Elvaris kernel: --- end user ---\r\n");

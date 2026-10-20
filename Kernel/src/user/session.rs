@@ -34,6 +34,7 @@
 //! have to guess them.
 
 use core::arch::global_asm;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::cpu::gdt::{USER_CODE_SELECTOR, USER_DATA_SELECTOR};
 use crate::cpu::vectors::InterruptFrame;
@@ -60,9 +61,9 @@ global_asm!(
     "    mov [rdi], rsp\n",
     "    lea rax, [rip + elvaris_user_resume]\n",
     "    mov [rdi+8], rax\n",
-    // The arguments of the user program live in the session: the message
-    // pointer and the length of the message. The kernel hands them over in
-    // RDI and RSI, the way the entry convention of the program describes.
+    // The arguments of the user program live in the session. The kernel hands
+    // them over in RDI, RSI, RDX and RCX, the way the entry conventions of the
+    // programs describe.
     "    mov r10, [rdi+16]\n",
     "    mov r11, [rdi+24]\n",
     // Build the frame that iretq pops, from the bottom up.
@@ -72,9 +73,14 @@ global_asm!(
     "    mov [rsp+16], r9\n",
     "    mov [rsp+24], rdx\n",
     "    mov [rsp+32], r8\n",
+    // The third and the fourth argument of the program. The registers that
+    // held the frame are free now.
+    "    mov rax, [rdi+56]\n",
+    "    mov rcx, [rdi+64]\n",
     // The user program starts with the arguments of its entry convention.
     "    mov rdi, r10\n",
     "    mov rsi, r11\n",
+    "    mov rdx, rax\n",
     // The user program expects the user data segment in DS and ES.
     "    mov ax, 0x23\n",
     "    mov ds, ax\n",
@@ -140,8 +146,11 @@ pub const OUTCOME_REJECTED: u64 = 3;
 /// The first four fields have a fixed layout: the assembly stub that enters
 /// user mode writes the resume stack pointer and the resume address into the
 /// first two of them, and reads the arguments of the user program out of the
-/// next two.
+/// next two. The last two fields hold the third and the fourth argument of
+/// the program; they sit behind the bookkeeping fields so that the layout of
+/// the first four never changes.
 #[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UserSession {
     /// The kernel stack pointer the kernel resumes with.
     ///
@@ -151,11 +160,11 @@ pub struct UserSession {
     ///
     /// The assembly stub writes it when the user mode is entered.
     pub resume_rip: u64,
-    /// The pointer to the message the user program is expected to write.
+    /// The first argument of the user program.
     ///
     /// The assembly stub hands it to the program in `RDI`.
     pub message_pointer: u64,
-    /// The length of that message.
+    /// The second argument of the user program.
     ///
     /// The assembly stub hands it to the program in `RSI`.
     pub message_length: u64,
@@ -166,6 +175,14 @@ pub struct UserSession {
     pub detail: u64,
     /// The number of system calls the user program made.
     pub syscalls: u64,
+    /// The third argument of the user program.
+    ///
+    /// The assembly stub hands it to the program in `RDX`.
+    pub argument_third: u64,
+    /// The fourth argument of the user program.
+    ///
+    /// The assembly stub hands it to the program in `RCX`.
+    pub argument_fourth: u64,
 }
 
 impl UserSession {
@@ -178,12 +195,21 @@ impl UserSession {
             outcome: OUTCOME_RUNNING,
             detail: 0,
             syscalls: 0,
+            argument_third: 0,
+            argument_fourth: 0,
         }
     }
 }
 
 /// The session of the single user program.
 static mut SESSION: UserSession = UserSession::new();
+
+/// The number of system calls the program that ran last made.
+///
+/// The counter lives outside the session, because the session of a nested
+/// program is replaced by the session of its caller when it ends. The
+/// counter of the program that just ran is still interesting then.
+static LAST_SYSCALLS: AtomicU64 = AtomicU64::new(0);
 
 /// How the user program ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -218,17 +244,32 @@ pub fn is_active() -> bool {
 /// Run the user program and return when it ends.
 ///
 /// The program starts at `entry` with `stack_top` as its stack pointer. The
-/// pointer and the length of the message the program is expected to write are
-/// handed over in `RDI` and `RSI`, the way the entry convention of the
-/// program describes.
-pub fn run(entry: u64, stack_top: u64, message_pointer: u64, message_length: u64) -> Outcome {
+/// four arguments of the program are handed over in `RDI`, `RSI`, `RDX` and
+/// `RCX`, the way the entry conventions of the programs describe.
+///
+/// The kernel may run a program while another one is running: a program that
+/// starts another one blocks in the system call while the child program runs.
+/// The state of the caller is saved before the program starts and restored
+/// when it ends, so that the child program cannot disturb it.
+pub fn run(entry: u64, stack_top: u64, arg0: u64, arg1: u64, arg2: u64, arg3: u64) -> Outcome {
+    // The kernel resumes through a plain jump, not through an interrupt gate,
+    // so the interrupt-enable flag is still cleared when the program ends.
+    // The state is saved here and restored below, so that the kernel keeps
+    // the interrupt state it had before it entered user mode.
+    let interrupts_enabled = crate::cpu::interrupts::are_enabled();
+
+    // The state of the caller, which a nested program must not disturb.
+    let saved = *session();
+
     {
         let session = session();
         session.outcome = OUTCOME_RUNNING;
         session.detail = 0;
         session.syscalls = 0;
-        session.message_pointer = message_pointer;
-        session.message_length = message_length;
+        session.message_pointer = arg0;
+        session.message_length = arg1;
+        session.argument_third = arg2;
+        session.argument_fourth = arg3;
     }
 
     // SAFETY: the session outlives the call, and the frame the assembly stub
@@ -244,6 +285,11 @@ pub fn run(entry: u64, stack_top: u64, message_pointer: u64, message_length: u64
         );
     }
 
+    // Restore the interrupt state the kernel had before the transition.
+    if interrupts_enabled {
+        unsafe { crate::cpu::interrupts::enable() };
+    }
+
     let outcome = {
         let session = session();
         let outcome = match session.outcome {
@@ -252,11 +298,19 @@ pub fn run(entry: u64, stack_top: u64, message_pointer: u64, message_length: u64
             OUTCOME_REJECTED => Outcome::Rejected(session.detail),
             _ => Outcome::Running,
         };
+        // The counter of the program that just ran outlives the session: the
+        // session of a nested program is replaced by the session of its
+        // caller when the nested program ends.
+        LAST_SYSCALLS.store(session.syscalls, Ordering::Relaxed);
         // The user program is gone: nothing may resume it.
         session.resume_rsp = 0;
         session.resume_rip = 0;
         outcome
     };
+
+    // A nested program must not disturb the state of the program that started
+    // it: that program is still running, and it resumes where it was.
+    *session() = saved;
 
     outcome
 }
@@ -306,6 +360,15 @@ pub fn syscall_count() -> u64 {
     session.syscalls
 }
 
+/// The number of system calls the program that ran last made.
+///
+/// The function reports the counter of the program that finished, even when
+/// that program was a nested one: the session of a nested program is
+/// replaced by the session of its caller when it ends.
+pub fn last_syscalls() -> u64 {
+    LAST_SYSCALLS.load(Ordering::Relaxed)
+}
+
 /// Handle an exception the user program caused.
 ///
 /// The exception does not take the kernel down. The user program is
@@ -330,7 +393,10 @@ pub fn handle_fault(frame: &InterruptFrame, vector: u8) -> ! {
         serial::write_newline();
         if vector == crate::cpu::vectors::vector::PAGE_FAULT {
             serial::write_str("Elvaris kernel: user: fault: address=0x");
-            serial::write_fmt(core::format_args!("{:x}", crate::cpu::exception::read_cr2()));
+            serial::write_fmt(core::format_args!(
+                "{:x}",
+                crate::cpu::exception::read_cr2()
+            ));
             serial::write_newline();
         }
     }
