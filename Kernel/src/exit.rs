@@ -22,6 +22,12 @@ pub const EXIT_PANIC: u32 = 0x11;
 /// Exit code written to the debugcon port to signal an unexpected halt.
 pub const EXIT_UNEXPECTED_HALT: u32 = 0x12;
 
+/// Exit code written to the debugcon port to signal a fatal CPU exception.
+///
+/// The exception diagnostics are printed before the code is written, so the
+/// host can tell an exception apart from a panic.
+pub const EXIT_EXCEPTION: u32 = 0x13;
+
 /// Write the status code to the debugcon port.
 ///
 /// Only a single byte is written. QEMU's `isa-debug-exit` device terminates the

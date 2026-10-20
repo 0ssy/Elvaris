@@ -188,10 +188,16 @@ impl KernelHeap {
 
 /// A minimal spin lock.
 ///
-/// The kernel heap is the only user. The lock is deliberately simple: it is
-/// not fair, has no priority inheritance, and is not safe to take in an
-/// interrupt context that can interrupt a thread that already holds it. A
-/// full SMP synchronization design is deferred to a later milestone.
+/// The lock is *interrupt safe*: interrupts are disabled while the lock is
+/// held. Without that, an interrupt that arrives while the kernel holds the
+/// lock and that tries to take the same lock would deadlock the machine: the
+/// interrupt handler would spin forever, waiting for a lock that the
+/// interrupted code cannot release until the handler returns.
+///
+/// The lock is deliberately simple: it is not fair, has no priority
+/// inheritance, and is not safe to take in an interrupt context that can
+/// interrupt a thread that already holds it. A full SMP synchronization
+/// design is deferred to a later milestone.
 pub struct SpinLock<T> {
     locked: AtomicBool,
     data: UnsafeCell<T>,
@@ -212,6 +218,10 @@ impl<T> SpinLock<T> {
 
     /// Acquire the lock, spinning until it is available.
     pub fn lock(&self) -> SpinLockGuard<'_, T> {
+        // Interrupts are disabled before the lock is taken and stay disabled
+        // until it is released: an interrupt handler must never be able to
+        // block on a lock the interrupted code holds.
+        let interrupts_enabled = mask_interrupts();
         while self
             .locked
             .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
@@ -219,13 +229,44 @@ impl<T> SpinLock<T> {
         {
             core::hint::spin_loop();
         }
-        SpinLockGuard { lock: self }
+        SpinLockGuard {
+            lock: self,
+            interrupts_enabled,
+        }
     }
 }
+
+/// Disable the interrupts and return whether they were enabled.
+///
+/// The host test build does not touch the interrupts of the host: the tests
+/// run on the developer's machine, not on the kernel.
+#[cfg(not(test))]
+fn mask_interrupts() -> bool {
+    unsafe { crate::cpu::interrupts::disable() }
+}
+
+/// Disable the interrupts and return whether they were enabled.
+#[cfg(test)]
+fn mask_interrupts() -> bool {
+    false
+}
+
+/// Restore the interrupt state saved by [`mask_interrupts`].
+#[cfg(not(test))]
+fn restore_interrupts(enabled: bool) {
+    if enabled {
+        unsafe { crate::cpu::interrupts::enable() };
+    }
+}
+
+/// Restore the interrupt state saved by [`mask_interrupts`].
+#[cfg(test)]
+fn restore_interrupts(_enabled: bool) {}
 
 /// Guard returned by [`SpinLock::lock`]; releases the lock when dropped.
 pub struct SpinLockGuard<'a, T> {
     lock: &'a SpinLock<T>,
+    interrupts_enabled: bool,
 }
 
 impl<T> core::ops::Deref for SpinLockGuard<'_, T> {
@@ -249,6 +290,7 @@ impl<T> core::ops::DerefMut for SpinLockGuard<'_, T> {
 impl<T> Drop for SpinLockGuard<'_, T> {
     fn drop(&mut self) {
         self.lock.locked.store(false, Ordering::Release);
+        restore_interrupts(self.interrupts_enabled);
     }
 }
 
