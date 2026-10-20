@@ -27,3 +27,6 @@ pub mod threads;
 
 #[cfg(any(test, feature = "alloc"))]
 pub mod block;
+
+#[cfg(any(test, feature = "alloc"))]
+pub mod fs;
