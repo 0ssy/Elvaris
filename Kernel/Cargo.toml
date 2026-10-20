@@ -10,6 +10,10 @@ bare = []
 
 [dependencies]
 bootloader_api = "0.11.17"
+x86_64 = "0.15"
+spin = "0.9"
+uart_16550 = "0.3"
+linked_list_allocator = "0.10"
 
 # The kernel binary is `#![no_main]` and links only for `x86_64-unknown-none`.
 # It cannot be linked for the host target, so it's gated behind the `bare`
@@ -25,6 +29,10 @@ test = false
 [[test]]
 name = "boot"
 path = "tests/boot.rs"
+
+[[test]]
+name = "heap"
+path = "tests/heap.rs"
 
 # `panic = "abort"` is defined at the workspace root (see ../Cargo.toml).
 # Profiles in non-root packages are silently ignored by Cargo, so we keep

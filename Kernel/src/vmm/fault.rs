@@ -1,36 +1,28 @@
 //! Page fault handling and diagnostics.
+//!
+//! A page fault is CPU exception 14. Once the interrupt descriptor table is
+//! installed, the fault reaches the unified exception handler of the CPU
+//! module, which prints the diagnostic and terminates the machine.
+//!
+//! This module keeps the bits of the page-fault error code and offers a
+//! direct entry point for the case where the kernel detects a fault itself.
 
-#![allow(dead_code)]
+use crate::cpu::exception;
 
-use crate::serial;
-
-/// Page fault error code bits.
+/// Bits of the page-fault error code.
 pub mod error_code {
-    pub const PRESENT: u32 = 1 << 0;
-    pub const WRITE: u32 = 1 << 1;
-    pub const USER: u32 = 1 << 2;
-    pub const RESERVED_WRITE: u32 = 1 << 3;
-    pub const INSTRUCTION_FETCH: u32 = 1 << 4;
+    #[allow(unused_imports)]
+    pub use crate::cpu::vectors::page_fault::*;
 }
 
-/// Print page fault diagnostics.
+/// Handle a page fault that the kernel detected itself.
 ///
-/// The kernel has no exception handling yet, so a page fault is reported and
-/// the CPU is halted.
+/// `fault_address` is the address that could not be accessed and
+/// `error_code` is the page-fault error code.
+///
+/// The diagnostic is the same one the unified exception path prints: the
+/// exception name, the error code, the instruction pointer, the stack pointer
+/// and the faulting address.
 pub fn handle_page_fault(fault_address: u64, error_code: u32) -> ! {
-    unsafe {
-        serial::write_str("Elvaris kernel: PAGE FAULT\r\n");
-        serial::write_str("Elvaris kernel: fault address: ");
-        serial::write_fmt(core::format_args!("0x{:x}", fault_address));
-        serial::write_newline();
-        serial::write_str("Elvaris kernel: error code: ");
-        serial::write_fmt(core::format_args!("0x{:x}", error_code));
-        serial::write_newline();
-    }
-    // Halt safely on page fault
-    loop {
-        unsafe {
-            core::arch::asm!("hlt", options(nomem, nostack, preserves_flags));
-        }
-    }
+    exception::report_faulting_page_fault(fault_address, error_code as u64)
 }

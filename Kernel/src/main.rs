@@ -1,18 +1,25 @@
 #![no_std]
 #![no_main]
 
-mod serial;
+extern crate alloc;
+
+#[cfg(feature = "bare")]
+mod threads;
 mod pmm;
 mod bootinfo;
 mod memory;
 mod exit;
 mod vmm;
 mod heap;
+mod cpu;
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 use bootloader_api::config::{BootloaderConfig, Mapping};
 use bootloader_api::entry_point;
 use bootloader_api::info::{BootInfo, MemoryRegionKind};
 
+use cpu::TIMER_FREQUENCY;
 use heap::HEAP_MAPPED_PAGES;
 use pmm::phys_alloc::PhysFrameAllocator;
 use vmm::mapper::Mapper;
@@ -23,6 +30,15 @@ use vmm::mapper::Mapper;
 /// it the kernel cannot dereference its own page tables, so the virtual-memory
 /// subsystem and the heap could not work.
 pub const PHYSICAL_MEMORY_OFFSET: u64 = 0xFFFF_8000_0000_0000;
+
+/// Number of timer ticks the kernel waits for before it reports success.
+const TIMER_TICKS_TARGET: u64 = 5;
+
+/// Upper bound of the spin loop that waits for the timer ticks.
+///
+/// The bound only matters when the timer does not work at all: the loop gives
+/// up instead of hanging the machine.
+const TIMER_WAIT_SPINS: u64 = 400_000_000;
 
 /// Configuration handed to the bootloader through the `.bootloader-config`
 /// section of the kernel image.
@@ -98,17 +114,38 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     }
     let frames_before = pmm.allocated_frames();
 
+    // SAFETY: CR3 belongs to the kernel address space and the direct map
+    // reported by the bootloader is present in it.
+    let mut mapper = match unsafe { Mapper::new(&mut pmm, phys_offset) } {
+        Ok(mapper) => mapper,
+        Err(err) => panic!("vmm: mapper creation failed: {:?}", err),
+    };
+
+    // The registers of the local APIC live in a page outside the usable
+    // physical memory, so the bootloader does not map them. The kernel maps
+    // the page itself before it touches the local APIC.
+    if let Err(err) = mapper.map_page_to(
+        cpu::apic::LAPIC_VIRTUAL_BASE,
+        cpu::apic::LAPIC_PHYSICAL_BASE,
+        cpu::MMIO_PAGE_FLAGS,
+    ) {
+        panic!("cpu: could not map the local apic registers: {:?}", err);
+    }
+    cpu::apic::set_base(cpu::apic::LAPIC_VIRTUAL_BASE);
+    unsafe {
+        serial::write_str("Elvaris kernel: cpu: apic registers mapped at 0x");
+        serial::write_fmt(core::format_args!("{:x}", cpu::apic::LAPIC_VIRTUAL_BASE));
+        serial::write_newline();
+    }
+
+    // Report the state the bootloader left the processor in. The report is
+    // taken before the kernel installs its own tables, so it shows the
+    // bootloader's global and interrupt descriptor tables.
+    cpu::state::report();
+
     // Kernel heap: map the initial heap pages and hand them to the allocator.
-    {
-        // SAFETY: CR3 belongs to the kernel address space and the direct map
-        // reported by the bootloader is present in it.
-        let mut mapper = match unsafe { Mapper::new(&mut pmm, phys_offset) } {
-            Ok(mapper) => mapper,
-            Err(err) => panic!("vmm: mapper creation failed: {:?}", err),
-        };
-        if let Err(err) = heap::init(&mut mapper) {
-            panic!("heap: initialization failed: {:?}", err);
-        }
+    if let Err(err) = heap::init(&mut mapper) {
+        panic!("heap: initialization failed: {:?}", err);
     }
     unsafe {
         serial::write_str("Elvaris kernel: heap: init ok\r\n");
@@ -147,11 +184,57 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         serial::write_str("Elvaris kernel: --- end heap ---\r\n");
     }
 
+    // CPU infrastructure: the global descriptor table, the task state segment,
+    // the interrupt descriptor table, the interrupt controllers and the timer.
+    // The interrupts stay disabled while this runs.
+    let kernel_stack_top = boot_info.kernel_stack_bottom + boot_info.kernel_stack_len;
+    let cpu_init = cpu::init(kernel_stack_top);
+    unsafe {
+        serial::write_str("Elvaris kernel: cpu: kernel_stack_top=0x");
+        serial::write_fmt(core::format_args!("{:x}", kernel_stack_top));
+        serial::write_str(" timer_hz=");
+        serial::write_fmt(core::format_args!("{}", TIMER_FREQUENCY));
+        serial::write_newline();
+    }
+
+    // Every handler is installed: the interrupts can be enabled now.
+    cpu::enable_interrupts();
+    unsafe {
+        serial::write_str("Elvaris kernel: cpu: interrupts enabled\r\n");
+    }
+
+    // Wait for the timer and prove that the interrupt path works.
+    let ticks = cpu::wait_for_timer_ticks(TIMER_TICKS_TARGET, TIMER_WAIT_SPINS);
+    unsafe {
+        serial::write_str("Elvaris kernel: interrupts: timer_ticks=");
+        serial::write_fmt(core::format_args!("{}", ticks));
+        serial::write_str(" hardware_interrupts=");
+        serial::write_fmt(core::format_args!("{}", cpu::timer::hardware_interrupts()));
+        serial::write_str(" total=");
+        serial::write_fmt(core::format_args!("{}", cpu::timer::total_interrupts()));
+        serial::write_newline();
+    }
+    if ticks == 0 {
+        panic!("cpu: no timer interrupt was received");
+    }
+    unsafe {
+        serial::write_str("Elvaris kernel: interrupts: timer ok\r\n");
+        serial::write_str("Elvaris kernel: cpu: apic_enabled=");
+        serial::write_fmt(core::format_args!("{}", cpu_init.apic_enabled));
+        serial::write_str(" pit_divisor=");
+        match cpu_init.pit_divisor {
+            Some(divisor) => serial::write_fmt(core::format_args!("{}", divisor)),
+            None => serial::write_str("none"),
+        }
+        serial::write_newline();
+        serial::write_str("Elvaris kernel: --- end interrupts ---\r\n");
+    }
+
     // Signal successful boot to the host via the QEMU debugcon device, then
     // halt. This is development-only; see exit.rs.
     unsafe { exit::exit(exit::EXIT_SUCCESS) };
 
-    // Halt. No interrupts, no scheduling, no subsystems yet.
+    // Halt. No scheduling, no subsystems yet.
     halt()
 }
 

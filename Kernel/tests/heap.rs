@@ -17,7 +17,7 @@ const HEAP_MARKERS: &[&str] = &[
     "Elvaris kernel: heap: init ok",
     // The heap took its pages from the PMM.
     "Elvaris kernel: heap: pmm_frames=",
-    "Elvaris kernel: heap: pmm_frames=260 ok",
+    "Elvaris kernel: heap: pmm_frames=262 ok",
     // The allocator itself.
     "Elvaris kernel: heap: self_test: alloc ok",
     "Elvaris kernel: heap: self_test: free ok",

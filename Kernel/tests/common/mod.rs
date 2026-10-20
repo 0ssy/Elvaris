@@ -90,6 +90,81 @@ pub fn ovmf_files() -> (PathBuf, PathBuf) {
     )
 }
 
+/// Name of the emulator executable.
+const QEMU_PROGRAM: &str = "qemu-system-x86_64";
+
+/// Directories the emulator is installed in when it is not on the path.
+///
+/// On Windows the installer puts the emulator in `C:\Program Files\qemu` and
+/// does not add it to the path; on the other systems the usual locations are
+/// enough.
+const QEMU_DIRECTORIES: &[&str] = &[
+    "C:\\Program Files\\qemu",
+    "C:\\Program Files (x86)\\qemu",
+    "/usr/bin",
+    "/usr/local/bin",
+    "/opt/homebrew/bin",
+];
+
+/// Locate the emulator.
+///
+/// The `ELVARIS_QEMU` environment variable wins, then the path, then the
+/// well-known installation directories. The search makes the integration tests
+/// work on a machine where the emulator is installed but not on the path.
+pub fn qemu_program() -> PathBuf {
+    if let Ok(path) = std::env::var("ELVARIS_QEMU") {
+        let path = PathBuf::from(path);
+        if path.is_file() {
+            return path;
+        }
+    }
+
+    if let Some(path) = find_on_path(QEMU_PROGRAM) {
+        return path;
+    }
+
+    let candidate = Path::new(r"C:\Program Files\qemu").join(executable_name(QEMU_PROGRAM));
+    if candidate.is_file() {
+        return candidate;
+    }
+
+    for directory in QEMU_DIRECTORIES {
+        if *directory == r"C:\Program Files\qemu" {
+            continue;
+        }
+        let candidate = Path::new(directory).join(executable_name(QEMU_PROGRAM));
+        if candidate.is_file() {
+            return candidate;
+        }
+    }
+
+    // Nothing was found: the name is returned unchanged, so that the error
+    // the caller sees names the program that is missing.
+    PathBuf::from(executable_name(QEMU_PROGRAM))
+}
+
+/// The name of the executable on this platform.
+fn executable_name(program: &str) -> String {
+    if cfg!(windows) {
+        format!("{}.exe", program)
+    } else {
+        program.to_string()
+    }
+}
+
+/// Search the path for an executable.
+fn find_on_path(program: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    let name = executable_name(program);
+    for directory in std::env::split_paths(&path) {
+        let candidate = directory.join(&name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
 /// Launch QEMU with the given image and capture its complete output.
 ///
 /// The output is drained by dedicated threads, so no serial output is lost
@@ -97,7 +172,7 @@ pub fn ovmf_files() -> (PathBuf, PathBuf) {
 pub fn run_qemu(image: &Path) -> std::io::Result<QemuOutput> {
     let (ovmf_code, ovmf_vars) = ovmf_files();
 
-    let mut child: Child = Command::new("qemu-system-x86_64")
+    let mut child: Child = Command::new(qemu_program())
         .args([
             "-machine",
             "q35",
