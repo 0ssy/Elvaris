@@ -1,11 +1,12 @@
 //! Virtual memory management.
 //!
 //! This module handles x86-64 page tables and virtual address space management.
-//! For Milestone 4, we focus on inspecting the bootloader's paging state,
-//! defining page table structures and flags, and setting up the foundation
-//! for safe virtual memory operations.
+//! It provides the page table structures and flags, an inspector for the
+//! bootloader's paging state, page-fault diagnostics, and the [`mapper`],
+//! which walks the four-level page table hierarchy to establish 4 KiB
+//! mappings. Page-table frames and mapped frames both come from the PMM, so
+//! the virtual-memory subsystem never manages physical memory itself.
 
-#![cfg_attr(not(test), no_std)]
 #![allow(dead_code)]
 
 pub mod entry;

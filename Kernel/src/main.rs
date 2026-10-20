@@ -6,11 +6,33 @@ mod pmm;
 mod bootinfo;
 mod memory;
 mod exit;
+mod vmm;
+mod heap;
 
+use bootloader_api::config::{BootloaderConfig, Mapping};
 use bootloader_api::entry_point;
 use bootloader_api::info::{BootInfo, MemoryRegionKind};
 
-entry_point!(kernel_main);
+use heap::HEAP_MAPPED_PAGES;
+use pmm::phys_alloc::PhysFrameAllocator;
+use vmm::mapper::Mapper;
+
+/// Base address of the physical-memory direct map.
+///
+/// The kernel asks the bootloader for a direct map of physical memory. Without
+/// it the kernel cannot dereference its own page tables, so the virtual-memory
+/// subsystem and the heap could not work.
+pub const PHYSICAL_MEMORY_OFFSET: u64 = 0xFFFF_8000_0000_0000;
+
+/// Configuration handed to the bootloader through the `.bootloader-config`
+/// section of the kernel image.
+pub static BOOTLOADER_CONFIG: BootloaderConfig = {
+    let mut config = BootloaderConfig::new_default();
+    config.mappings.physical_memory = Some(Mapping::FixedAddress(PHYSICAL_MEMORY_OFFSET));
+    config
+};
+
+entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
 /// Elvaris kernel entry point.
 ///
@@ -55,14 +77,74 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     memory::report_summary(&summary);
 
     // Physical memory management initialization.
-    let mut pmm = pmm::phys_alloc::PhysFrameAllocator::new();
-    let _ = pmm.init(regions);
+    let mut pmm = PhysFrameAllocator::new();
+    if !pmm.init(regions) {
+        panic!("pmm: initialization failed");
+    }
     unsafe {
         serial::write_str("Elvaris kernel: pmm: usable_regions=");
         serial::write_fmt(core::format_args!("{}", pmm.usable_region_count()));
         serial::write_str(" total_frames=");
         serial::write_fmt(core::format_args!("{}", pmm.total_frames()));
+        serial::write_str(" allocated_frames=");
+        serial::write_fmt(core::format_args!("{}", pmm.allocated_frames()));
         serial::write_newline();
+    }
+
+    // The physical-memory direct map is what makes the page tables reachable.
+    let phys_offset = boot_info.physical_memory_offset.as_ref().copied();
+    if phys_offset.is_none() {
+        panic!("vmm: the bootloader did not provide a physical memory mapping");
+    }
+    let frames_before = pmm.allocated_frames();
+
+    // Kernel heap: map the initial heap pages and hand them to the allocator.
+    {
+        // SAFETY: CR3 belongs to the kernel address space and the direct map
+        // reported by the bootloader is present in it.
+        let mut mapper = match unsafe { Mapper::new(&mut pmm, phys_offset) } {
+            Ok(mapper) => mapper,
+            Err(err) => panic!("vmm: mapper creation failed: {:?}", err),
+        };
+        if let Err(err) = heap::init(&mut mapper) {
+            panic!("heap: initialization failed: {:?}", err);
+        }
+    }
+    unsafe {
+        serial::write_str("Elvaris kernel: heap: init ok\r\n");
+    }
+
+    // The heap must have taken its pages from the PMM: the frame count has to
+    // grow by at least the number of heap pages, and by no more than that
+    // plus the page-table frames the mapping needed plus the frame the
+    // mapper refuses to map (physical address zero).
+    let frames_used = pmm.allocated_frames() - frames_before;
+    if frames_used < HEAP_MAPPED_PAGES as u64 || frames_used > HEAP_MAPPED_PAGES as u64 + 32 {
+        panic!("heap: unexpected pmm frame usage: {}", frames_used);
+    }
+    unsafe {
+        serial::write_str("Elvaris kernel: heap: pmm_frames=");
+        serial::write_fmt(core::format_args!("{}", frames_used));
+        serial::write_str(" ok\r\n");
+        serial::write_str("Elvaris kernel: pmm: allocated_frames=");
+        serial::write_fmt(core::format_args!("{}", pmm.allocated_frames()));
+        serial::write_str(" free_frames=");
+        serial::write_fmt(core::format_args!("{}", pmm.free_frames()));
+        serial::write_newline();
+    }
+
+    // Exercise the heap: allocate, write, verify, free, exhaust.
+    if let Err(err) = heap::self_test() {
+        panic!("heap: self test failed: {:?}", err);
+    }
+    unsafe {
+        serial::write_str("Elvaris kernel: heap: self_test ok\r\n");
+    }
+
+    // Report the heap configuration and statistics.
+    heap::report();
+    unsafe {
+        serial::write_str("Elvaris kernel: --- end heap ---\r\n");
     }
 
     // Signal successful boot to the host via the QEMU debugcon device, then

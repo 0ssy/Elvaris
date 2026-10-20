@@ -1,8 +1,9 @@
 //! Development-only QEMU termination.
 //!
-//! This module writes a status code to the QEMU `isa-debugcon` port at I/O
-//! base 0x402. When QEMU is started with `-debugcon stdio` (or
-//! `-debugcon file:...`), the host can read the code and distinguish:
+//! This module writes a status code to the QEMU `isa-debug-exit` port at I/O
+//! base 0x402. When QEMU is started with
+//! `-device isa-debug-exit,iobase=0x402,iosize=1`, the device terminates the
+//! emulator and the host can read the encoded code and distinguish:
 //!
 //!   success, kernel panic, unexpected halt, timeout
 //!
@@ -21,18 +22,22 @@ pub const EXIT_PANIC: u32 = 0x11;
 /// Exit code written to the debugcon port to signal an unexpected halt.
 pub const EXIT_UNEXPECTED_HALT: u32 = 0x12;
 
-/// Write a 32-bit status code to the debugcon port, low byte first.
+/// Write the status code to the debugcon port.
+///
+/// Only a single byte is written. QEMU's `isa-debug-exit` device terminates the
+/// emulator on the *first* write to the port and encodes the byte it received
+/// in the host exit code. Writing the remaining three bytes of a 32-bit value
+/// races with the shutdown that the first byte triggered, so the reported exit
+/// code became nondeterministic (the first byte won sometimes, a later zero
+/// byte won other times). The status codes are all below 0x100, so one byte
+/// carries the whole value.
 ///
 /// # Safety
 /// Port I/O is inherently unsafe. Call this only from the final shutdown path.
 pub unsafe fn exit(status: u32) {
-    // QEMU's debugcon device accepts one byte at a time on port 0x402.
-    // Write the status code as four little-endian bytes.
+    // QEMU's debug exit device accepts one byte at a time on port 0x402.
     unsafe {
         write_port(DEBUGCON_PORT, (status & 0xFF) as u8);
-        write_port(DEBUGCON_PORT, ((status >> 8) & 0xFF) as u8);
-        write_port(DEBUGCON_PORT, ((status >> 16) & 0xFF) as u8);
-        write_port(DEBUGCON_PORT, ((status >> 24) & 0xFF) as u8);
     }
 }
 

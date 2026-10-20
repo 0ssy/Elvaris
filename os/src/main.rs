@@ -30,14 +30,15 @@ fn main() {
             "-drive",
             &format!("if=none,format=raw,file={},id=hd0", image.display()),
             "-device", "virtio-blk-pci,drive=hd0,bootindex=2",
-            // The kernel writes a 4-byte exit status to port 0x402. The
+            // The kernel writes a single exit status byte to port 0x402. The
             // isa-debug-exit device makes QEMU terminate with that byte as its
             // exit code, so automated tests can distinguish success, panic,
-            // unexpected halt, and timeout.
+            // unexpected halt, and timeout. Exactly one byte is written: the
+            // device terminates on the first write, and further writes race
+            // with the shutdown and make the reported code nondeterministic.
             "-device", "isa-debug-exit,iobase=0x402,iosize=1",
-            // Keep the debugcon on a separate port so the raw exit bytes are
-            // also visible on stdout for manual inspection without colliding
-            // with the debug-exit device.
+            // Keep the debugcon on a separate port so that it does not
+            // collide with the debug-exit device.
             "-debugcon", "stdio",
             "-global", "isa-debugcon.iobase=0x403",
         ])

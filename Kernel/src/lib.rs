@@ -8,3 +8,5 @@ pub mod memory;
 pub mod exit;
 
 pub mod vmm;
+
+pub mod heap;

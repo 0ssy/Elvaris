@@ -14,8 +14,9 @@ pub mod error_code {
 }
 
 /// Print page fault diagnostics.
-/// 
-/// For Milestone 4, this provides basic diagnostics before halting.
+///
+/// The kernel has no exception handling yet, so a page fault is reported and
+/// the CPU is halted.
 pub fn handle_page_fault(fault_address: u64, error_code: u32) -> ! {
     unsafe {
         serial::write_str("Elvaris kernel: PAGE FAULT\r\n");

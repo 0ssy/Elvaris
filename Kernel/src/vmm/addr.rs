@@ -1,8 +1,7 @@
 //! Virtual and physical address utilities.
 //!
-//! For Milestone 4, we document and implement basic address translation
-//! helpers. We must not assume identity mapping; we rely on the bootloader's
-//! physical-memory offset if available.
+//! The kernel must not assume identity mapping: it relies on the bootloader's
+//! physical-memory offset when it is available.
 
 #![allow(dead_code)]
 

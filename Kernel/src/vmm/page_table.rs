@@ -2,10 +2,15 @@
 
 #![allow(dead_code)]
 
-use crate::pmm::phys_alloc::PhysFrameAllocator;
-
 pub const PAGE_SIZE: u64 = 4096;
 pub const ENTRIES_PER_TABLE: usize = 512;
+
+/// Mask that extracts the physical frame address from a page table entry.
+///
+/// The address occupies bits 12..=51; the remaining bits are flags. Masking
+/// only the low twelve bits would leave the flag bits (notably the
+/// no-execute bit in bit 63) in the address.
+pub const FRAME_MASK: u64 = 0x000F_FFFF_FFFF_F000;
 
 /// Index bit positions for the four-level x86-64 page table walk (4 KiB pages).
 const PML4_SHIFT: u64 = 39;
