@@ -124,6 +124,29 @@ impl PhysFrameAllocator {
         None
     }
 
+    /// Allocate a run of consecutive physical frames.
+    ///
+    /// The function returns the physical address of the first frame of the
+    /// run, or `None` when no region is big enough. A device that reaches
+    /// the memory of the kernel directly needs such a run: the parts of a
+    /// request have to lie one behind the other.
+    pub fn allocate_contiguous_frames(&mut self, count: usize) -> Option<u64> {
+        if count == 0 {
+            return None;
+        }
+        let needed = (count as u64) * FRAME_SIZE;
+        for i in 0..self.count {
+            let r = &mut self.regions[i];
+            if r.cursor + needed <= r.end {
+                let addr = r.cursor;
+                r.cursor += needed;
+                self.allocated_frames += count as u64;
+                return Some(addr);
+            }
+        }
+        None
+    }
+
     /// Deallocate a physical frame.
     ///
     /// # Limitation

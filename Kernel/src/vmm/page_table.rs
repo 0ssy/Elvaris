@@ -29,6 +29,15 @@ pub mod entry_flags {
     pub const ACCESSED: u64 = 1 << 5;
     pub const DIRTY: u64 = 1 << 6;
     pub const HUGE_PAGE: u64 = 1 << 7;
+    /// The attribute of the page, for a page of four kilobytes.
+    ///
+    /// In an entry that describes a page of four kilobytes the seventh bit
+    /// holds the attribute of the page, and not the size of the page: the
+    /// size of a page is only written in the entries of the upper levels of
+    /// the hierarchy. Together with the write-through and the no-cache bit,
+    /// the attribute chooses the memory type of the page out of the table of
+    /// the processor.
+    pub const PAT: u64 = 1 << 7;
     pub const GLOBAL: u64 = 1 << 8;
     pub const NO_EXECUTE: u64 = 1 << 63;
 }

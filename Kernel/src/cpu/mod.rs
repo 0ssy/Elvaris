@@ -65,6 +65,22 @@ pub const MMIO_PAGE_FLAGS: u64 =
         | crate::vmm::page_table::entry_flags::WRITABLE
         | crate::vmm::page_table::entry_flags::NO_EXECUTE;
 
+/// Page-table flags used for the registers of a device that is driven by
+/// the kernel.
+///
+/// The registers of a device must not be cached: the device changes them
+/// without the processor knowing, and the processor must not change them
+/// without the device knowing. A cache would hide the changes of the device
+/// from the kernel, and it would hide the changes of the kernel from the
+/// device.
+///
+/// The attribute of the page, the write-through bit, and the no-cache bit
+/// choose the uncacheable memory type of the processor for the page.
+pub const MMIO_UNCACHED_FLAGS: u64 = MMIO_PAGE_FLAGS
+    | crate::vmm::page_table::entry_flags::WRITE_THROUGH
+    | crate::vmm::page_table::entry_flags::NO_CACHE
+    | crate::vmm::page_table::entry_flags::PAT;
+
 /// What the initialization installed.
 #[derive(Debug, Clone, Copy)]
 pub struct CpuInit {

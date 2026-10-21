@@ -166,6 +166,57 @@ fn executable_name(program: &str) -> String {
     }
 }
 
+/// The size of the data disk the tests use, in bytes.
+///
+/// The disk holds the filesystem of the machine, which is small: the
+/// programs of the userland and the files of the person at the console.
+pub const DATA_DISK_SIZE: u64 = 64 * 1024;
+
+/// Create an empty data disk for the guest.
+///
+/// The disk is a plain file of the given size. The guest writes its
+/// filesystem into it, and reads it back on the next boot.
+pub fn create_data_disk(path: &Path, size: u64) -> std::io::Result<()> {
+    let file = std::fs::File::create(path)?;
+    file.set_len(size)?;
+    Ok(())
+}
+
+/// A directory the test may write into, removed when the test ends.
+pub struct TempDir {
+    path: PathBuf,
+}
+
+impl TempDir {
+    /// Create a directory with a fresh name.
+    pub fn new(name: &str) -> std::io::Result<Self> {
+        let mut path = std::env::temp_dir();
+        let stamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|since| since.as_nanos())
+            .unwrap_or(0);
+        path.push(format!("elvaris-{name}-{}-{stamp}", std::process::id()));
+        std::fs::create_dir_all(&path)?;
+        Ok(TempDir { path })
+    }
+
+    /// The path of the directory.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// The path of a file inside the directory.
+    pub fn file(&self, name: &str) -> PathBuf {
+        self.path.join(name)
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
+
 /// Search the path for an executable.
 fn find_on_path(program: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
@@ -195,6 +246,19 @@ pub fn run_qemu(image: &Path) -> std::io::Result<QemuOutput> {
 /// one. The shell is told to stop at the end, so that the machine ends the
 /// boot on its own and QEMU reports the exit code of the guest.
 pub fn run_qemu_session(image: &Path, commands: &[&str]) -> std::io::Result<QemuOutput> {
+    run_qemu_session_with_disk(image, None, commands)
+}
+
+/// Launch QEMU with a data disk, `drive` the shell of the guest, and capture
+/// the output.
+///
+/// The data disk is attached to the guest as a second block device. The
+/// guest uses it to keep its files between two boots.
+pub fn run_qemu_session_with_disk(
+    image: &Path,
+    disk: Option<&Path>,
+    commands: &[&str],
+) -> std::io::Result<QemuOutput> {
     let (ovmf_code, ovmf_vars) = ovmf_files();
 
     // The test owns the port of the serial console, so that the guest
@@ -202,38 +266,50 @@ pub fn run_qemu_session(image: &Path, commands: &[&str]) -> std::io::Result<Qemu
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let port = listener.local_addr()?.port();
 
-    let mut child: Child = Command::new(qemu_program())
-        .args([
-            "-machine",
-            "q35",
-            "-m",
-            "512",
-            "-nographic",
-            "-monitor",
-            "none",
-            "-no-reboot",
-            "-net",
-            "none",
+    let mut command = Command::new(qemu_program());
+    command.args([
+        "-machine",
+        "q35",
+        "-m",
+        "512",
+        "-nographic",
+        "-monitor",
+        "none",
+        "-no-reboot",
+        "-net",
+        "none",
+        "-drive",
+        &format!(
+            "if=pflash,unit=0,format=raw,file={},readonly=on",
+            ovmf_code.display()
+        ),
+        "-drive",
+        &format!("if=pflash,unit=1,format=raw,file={}", ovmf_vars.display()),
+        "-drive",
+        &format!("if=none,format=raw,file={},id=hd0", image.display()),
+        "-device",
+        "virtio-blk-pci,drive=hd0,bootindex=2",
+    ]);
+    if let Some(disk) = disk {
+        command.args([
             "-drive",
-            &format!(
-                "if=pflash,unit=0,format=raw,file={},readonly=on",
-                ovmf_code.display()
-            ),
-            "-drive",
-            &format!("if=pflash,unit=1,format=raw,file={}", ovmf_vars.display()),
-            "-drive",
-            &format!("if=none,format=raw,file={},id=hd0", image.display()),
+            &format!("if=none,format=raw,file={},id=data0", disk.display()),
             "-device",
-            "virtio-blk-pci,drive=hd0,bootindex=2",
-            "-device",
-            "isa-debug-exit,iobase=0x402,iosize=1",
-            "-debugcon",
-            "stdio",
-            "-global",
-            "isa-debugcon.iobase=0x403",
-            "-serial",
-            &format!("tcp:127.0.0.1:{port}"),
-        ])
+            "virtio-blk-pci,drive=data0",
+        ]);
+    }
+    command.args([
+        "-device",
+        "isa-debug-exit,iobase=0x402,iosize=1",
+        "-debugcon",
+        "stdio",
+        "-global",
+        "isa-debugcon.iobase=0x403",
+        "-serial",
+        &format!("tcp:127.0.0.1:{port}"),
+    ]);
+
+    let mut child: Child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;

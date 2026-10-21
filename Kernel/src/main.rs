@@ -12,6 +12,7 @@ mod fs;
 mod heap;
 mod memory;
 mod pmm;
+mod pci;
 mod process;
 mod serial;
 mod storage;
@@ -19,6 +20,7 @@ mod sysinfo;
 #[cfg(feature = "bare")]
 mod threads;
 mod user;
+mod virtio;
 mod vmm;
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -248,7 +250,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     // The filesystem of the machine. It holds the programs of the userland,
     // and it is the only way a user program reaches a file.
-    if let Err(err) = storage::initialize() {
+    if let Err(err) = storage::initialize(&mut mapper) {
         panic!("storage: the filesystem could not be created: {:?}", err);
     }
     unsafe {
@@ -310,6 +312,10 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         serial::write_fmt(core::format_args!("{}", pmm.free_frames()));
         serial::write_newline();
     }
+
+    // The files of the machine are written back before it stops, so they
+    // survive a restart.
+    let _ = storage::sync();
 
     // Signal successful boot to the host via the QEMU debugcon device, then
     // halt. This is development-only; see exit.rs.

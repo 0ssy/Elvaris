@@ -34,3 +34,6 @@ pub mod threads;
 pub mod block;
 
 pub mod fs;
+
+pub mod pci;
+pub mod virtio;

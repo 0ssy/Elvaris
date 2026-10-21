@@ -45,6 +45,8 @@ use alloc::vec::Vec;
 #[cfg(test)]
 mod tests;
 
+pub mod virtio;
+
 /// The size of one block in bytes.
 ///
 /// The value is fixed for the whole milestone: every block device the
@@ -85,7 +87,11 @@ impl BlockError {
 /// The trait is object safe on purpose: the filesystem holds a reference to
 /// the device it was mounted on, and the kernel can therefore choose the
 /// medium at run time.
-pub trait BlockDevice {
+///
+/// The trait asks for `Send` and `Sync`: the filesystem of the machine lives
+/// in a static variable, and the static variable has to be safe to reach
+/// from every part of the kernel.
+pub trait BlockDevice: Send + Sync {
     /// The size of one block in bytes.
     fn block_size(&self) -> usize;
 

@@ -56,6 +56,7 @@
 //! - There is no symbolic link, no hard link, no device file and no named
 //!   pipe.
 
+use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;
@@ -84,6 +85,13 @@ const OWNER_USER: u8 = 1;
 
 /// The number of blocks the device of a new filesystem holds.
 pub const DEFAULT_BLOCKS: usize = 64;
+
+/// The number of blocks the image of the filesystem may use.
+///
+/// The image of the filesystem is read into the memory of the kernel when
+/// the filesystem is mounted, so the image has to be small enough to fit
+/// into the heap. A filesystem that is bigger than this does not fit.
+pub const MAX_IMAGE_BLOCKS: usize = 128;
 
 /// The maximum number of handles that are open at the same time.
 pub const MAX_OPEN_HANDLES: usize = 32;
@@ -188,7 +196,7 @@ struct Handle {
 
 /// The in-memory filesystem.
 pub struct MemFs {
-    device: MemoryBlockDevice,
+    device: Box<dyn BlockDevice>,
     root: Node,
     handles: Vec<Option<Handle>>,
     mounted: bool,
@@ -203,8 +211,17 @@ impl MemFs {
 
     /// Create an empty filesystem with a device of `blocks` blocks.
     pub fn with_blocks(blocks: usize) -> Self {
+        Self::with_device(Box::new(MemoryBlockDevice::new(blocks)))
+    }
+
+    /// Create an empty filesystem on a device.
+    ///
+    /// The device is the medium of the filesystem: a device in memory, or a
+    /// disk in the host. The filesystem writes its image into the device,
+    /// and reads it back from it when it is mounted.
+    pub fn with_device(device: Box<dyn BlockDevice>) -> Self {
         MemFs {
-            device: MemoryBlockDevice::new(blocks),
+            device,
             root: Node::Directory {
                 entries: Vec::new(),
                 permissions: Permissions::directory(),
@@ -226,13 +243,13 @@ impl MemFs {
     }
 
     /// The device the filesystem keeps its content in.
-    pub fn device(&self) -> &MemoryBlockDevice {
-        &self.device
+    pub fn device(&self) -> &dyn BlockDevice {
+        self.device.as_ref()
     }
 
     /// The device the filesystem keeps its content in, for writing.
-    pub fn device_mut(&mut self) -> &mut MemoryBlockDevice {
-        &mut self.device
+    pub fn device_mut(&mut self) -> &mut dyn BlockDevice {
+        self.device.as_mut()
     }
 
     /// Write an image into the device of the filesystem.
@@ -363,7 +380,7 @@ impl MemFs {
     /// A device that holds no image at all describes an empty filesystem:
     /// the mount succeeds and the root has no entries.
     fn load_image(&mut self) -> Result<(), FsError> {
-        let bytes = self.device.to_bytes();
+        let bytes = self.read_image()?;
         if bytes.len() < IMAGE_MAGIC.len() + 8 || bytes[..IMAGE_MAGIC.len()] == [0u8; 8] {
             // The device is empty: the filesystem starts with an empty root.
             self.root = Node::Directory {
@@ -423,6 +440,20 @@ impl MemFs {
 
         self.root = root;
         Ok(())
+    }
+
+    /// Read the image of the filesystem out of the device.
+    ///
+    /// The image is read into the memory of the kernel, so only the first
+    /// blocks of the device are read: a device that is much bigger than the
+    /// image holds nothing else.
+    fn read_image(&self) -> Result<Vec<u8>, FsError> {
+        let count = self.device.block_count().min(MAX_IMAGE_BLOCKS);
+        let mut bytes = alloc::vec![0u8; count * BLOCK_SIZE];
+        self.device
+            .read_blocks(0, &mut bytes)
+            .map_err(map_block_error)?;
+        Ok(bytes)
     }
 }
 

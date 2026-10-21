@@ -88,9 +88,7 @@ impl MapFlags {
 
     /// Validate flag combinations: reject contradictory or nonsensical flags.
     pub fn validate(bits: u64) -> Result<(), MapError> {
-        // No-execute with write is allowed (W^X policy is enforced elsewhere).
-        // Huge pages are not supported by this mapper.
-        if (bits & entry_flags::HUGE_PAGE) != 0 {
+        if bits & entry_flags::HUGE_PAGE != 0 {
             return Err(MapError::HugePageUnsupported);
         }
         Ok(())
@@ -243,6 +241,22 @@ impl<'a> Mapper<'a> {
     /// Translate a physical address into the direct map's virtual address.
     pub fn phys_to_virt(&self, phys: u64) -> u64 {
         phys.wrapping_add(self.phys_offset)
+    }
+
+    /// Allocate a run of consecutive physical frames.
+    ///
+    /// The function returns the physical address of the first frame of the
+    /// run. The frames are not mapped: the caller reaches them through the
+    /// direct map, or maps them itself. A device that reaches the memory of
+    /// the kernel directly needs such a run, because the parts of a request
+    /// have to lie one behind the other.
+    pub fn allocate_frames(&mut self, count: usize) -> Result<u64, MapError> {
+        let address = self
+            .allocator
+            .allocate_contiguous_frames(count)
+            .ok_or(MapError::OutOfMemory)?;
+        self.frames_allocated += count as u64;
+        Ok(address)
     }
 
     /// Obtain a pointer to a page-table frame.

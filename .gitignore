@@ -19,3 +19,6 @@ ovmf-x86_64/
 # Output of the emulator, written by the manual test scripts
 qemu-stdout.txt
 qemu-stderr.txt
+
+# Kilo local state
+.kilo/

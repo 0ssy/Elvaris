@@ -521,6 +521,9 @@ fn shutdown(frame: &mut InterruptFrame) {
     unsafe {
         serial::write_str("Elvaris kernel: shutdown: the machine stops\r\n");
     }
+    // The files of the machine are written back before it stops, so they
+    // survive a restart.
+    let _ = crate::storage::sync();
     // SAFETY: the machine stops here, and the code tells the host that the
     // boot was successful.
     unsafe { crate::exit::exit(crate::exit::EXIT_SUCCESS) };
@@ -535,6 +538,9 @@ fn reboot(frame: &mut InterruptFrame) {
     unsafe {
         serial::write_str("Elvaris kernel: reboot: the machine cannot reset itself yet\r\n");
     }
+    // The files of the machine are written back before it stops, so they
+    // survive a restart.
+    let _ = crate::storage::sync();
     unsafe { crate::exit::exit(crate::exit::EXIT_SUCCESS) };
     frame.rax = 0;
 }
