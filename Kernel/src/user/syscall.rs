@@ -486,7 +486,7 @@ fn exec(frame: &mut InterruptFrame) {
         }
     };
 
-    let parent = process::running();
+    let parent = None;
     let pid = process::register(&path, parent, 0);
     process::set_running(pid);
 

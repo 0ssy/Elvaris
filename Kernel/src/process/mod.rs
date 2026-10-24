@@ -71,6 +71,27 @@ impl ProcessTable {
     pub fn get_mut(&mut self, pid: ProcessId) -> Option<&mut Process> {
         self.processes.iter_mut().find(|p| p.id == pid)
     }
+
+    /// Get a process by pid if it exists and is not reaped.
+    pub fn find(&self, pid: ProcessId) -> Option<&Process> {
+        self.processes.iter().find(|p| p.id == pid && p.state != ProcessState::Reaped)
+    }
+
+    /// Get mutable process if not reaped.
+    pub fn find_mut(&mut self, pid: ProcessId) -> Option<&mut Process> {
+        self.processes.iter_mut().find(|p| p.id == pid && p.state != ProcessState::Reaped)
+    }
+
+    /// Mark process as reaped.
+    pub fn reap(&mut self, pid: ProcessId) -> bool {
+        if let Some(process) = self.processes.iter_mut().find(|p| p.id == pid) {
+            if process.state == ProcessState::Exited || process.state == ProcessState::Faulted {
+                process.state = ProcessState::Reaped;
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl Default for ProcessTable {
@@ -136,9 +157,26 @@ pub fn finish(pid: ProcessId, status: ExitStatus) {
     }
 }
 
-/// The identifier of the process that runs at the moment.
-pub fn running() -> Option<ProcessId> {
-    *RUNNING.lock()
+/// Find a process if it exists and is not reaped.
+pub fn find(pid: ProcessId) -> Option<Process> {
+    let table = TABLE.lock();
+    table.find(pid).cloned()
+}
+
+/// Get mutable access to process if not reaped.
+pub fn find_mut(pid: ProcessId) -> Option<()> {
+    let mut table = TABLE.lock();
+    if table.find_mut(pid).is_some() {
+        Some(())
+    } else {
+        None
+    }
+}
+
+/// Mark process as reaped.
+pub fn reap(pid: ProcessId) -> bool {
+    let mut table = TABLE.lock();
+    table.reap(pid)
 }
 
 /// The number of processes the table holds.

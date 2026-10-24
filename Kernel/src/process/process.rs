@@ -1,7 +1,3 @@
-//! Process types.
-
-#![allow(dead_code)]
-
 use alloc::string::String;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -12,19 +8,22 @@ pub enum ProcessState {
     Created,
     Runnable,
     Running,
+    Waiting,
     Exited,
     Faulted,
+    Reaped,
 }
 
 impl ProcessState {
-    /// A short name of the state, used in the process report.
-    pub const fn name(&self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             ProcessState::Created => "created",
             ProcessState::Runnable => "runnable",
             ProcessState::Running => "running",
+            ProcessState::Waiting => "waiting",
             ProcessState::Exited => "exited",
             ProcessState::Faulted => "faulted",
+            ProcessState::Reaped => "reaped",
         }
     }
 }
@@ -52,8 +51,7 @@ pub enum ExitStatus {
 }
 
 impl ExitStatus {
-    /// A short description of the status, used in the process report.
-    pub const fn name(&self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             ExitStatus::Pending => "pending",
             ExitStatus::Exited(_) => "exited",
@@ -113,23 +111,16 @@ impl AddressSpace {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ProgramDescriptor {
     pub entry: u64,
 }
 
 pub const MAX_RESOURCES: usize = 8;
 
-/// A process of the machine.
-///
-/// The kernel owns one address space and one user window, so the processes
-/// of this milestone do not run at the same time: a program that starts
-/// another one blocks until the program it started ends. The table records
-/// the processes anyway, because the shell has to report them.
 #[derive(Debug, Clone)]
 pub struct Process {
     pub id: ProcessId,
-    /// The path of the program of the process.
     pub name: String,
     pub parent: Option<ProcessId>,
     pub security: SecurityIdentity,
@@ -163,16 +154,13 @@ impl Process {
         };
     }
 
-    /// The exit code of the process, if it ended normally.
     pub const fn exit_code(&self) -> Option<u64> {
         match self.status {
             ExitStatus::Exited(code) => Some(code),
             _ => None,
         }
     }
-}
 
-impl Process {
     pub const fn kernel_identity() -> SecurityIdentity {
         SecurityIdentity { uid: 0, gid: 0 }
     }
