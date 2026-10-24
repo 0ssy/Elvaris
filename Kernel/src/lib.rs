@@ -25,7 +25,7 @@ pub mod process;
 pub mod user;
 
 pub mod console;
-pub mod storage;
+pub mod input;pub mod storage;
 pub mod sysinfo;
 
 #[cfg(any(test, feature = "alloc"))]
