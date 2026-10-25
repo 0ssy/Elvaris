@@ -15,6 +15,7 @@ mod pmm;
 mod pci;
 mod process;
 mod security;
+mod net;
 mod serial;
 mod storage;
 mod sysinfo;
@@ -202,6 +203,9 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     unsafe {
         serial::write_str("Elvaris kernel: security: initialized\r\n");
     }
+
+    // Initialize networking
+    net::service::init_network();
     unsafe {
         serial::write_str("Elvaris kernel: --- end heap ---\r\n");
     }

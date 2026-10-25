@@ -24,6 +24,7 @@ pub mod cpu;
 pub mod process;
 pub mod user;
 pub mod security;
+pub mod net;
 
 pub mod console;
 pub mod input;pub mod storage;
