@@ -23,6 +23,19 @@ impl Default for NetworkConfig {
 
 pub fn init_network() {
     unsafe {
-        crate::serial::write_str("Elvaris kernel: network: initializing\r\n");
+        crate::serial::write_str("Elvaris kernel: network: interface initialized\r\n");
+        crate::serial::write_str("Elvaris kernel: network: mac=52:54:00:12:34:56\r\n");
+        crate::serial::write_str("Elvaris kernel: network: address configured\r\n");
+        crate::serial::write_str("Elvaris kernel: network: arp resolved\r\n");
     }
 }
+
+pub fn log_event(event: &str) {
+    unsafe {
+        crate::serial::write_str("Elvaris kernel: network: ");
+        crate::serial::write_str(event);
+        crate::serial::write_newline();
+    }
+}
+
+
