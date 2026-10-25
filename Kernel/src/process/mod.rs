@@ -92,6 +92,27 @@ impl ProcessTable {
         }
         false
     }
+
+    /// Get a process by pid if it exists and is not reaped.
+    pub fn find(&self, pid: ProcessId) -> Option<&Process> {
+        self.processes.iter().find(|p| p.id == pid && p.state != ProcessState::Reaped)
+    }
+
+    /// Get mutable process if not reaped.
+    pub fn find_mut(&mut self, pid: ProcessId) -> Option<&mut Process> {
+        self.processes.iter_mut().find(|p| p.id == pid && p.state != ProcessState::Reaped)
+    }
+
+    /// Mark process as reaped.
+    pub fn reap(&mut self, pid: ProcessId) -> bool {
+        if let Some(process) = self.processes.iter_mut().find(|p| p.id == pid) {
+            if process.state == ProcessState::Exited || process.state == ProcessState::Faulted {
+                process.state = ProcessState::Reaped;
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl Default for ProcessTable {
@@ -184,9 +205,86 @@ pub fn count() -> usize {
     TABLE.lock().count()
 }
 
+/// Mark a process as waiting.
+pub fn set_waiting(pid: ProcessId) {
+    let mut table = TABLE.lock();
+    if let Some(process) = table.get_mut(pid) {
+        process.state = ProcessState::Waiting;
+    }
+}
+
+/// Wait for a child process to exit/fault and reap it.
+pub fn wait(pid: Option<ProcessId>) -> Option<(ProcessId, ExitStatus)> {
+    let mut table = TABLE.lock();
+    if let Some(target_pid) = pid {
+        if let Some(process) = table.processes.iter_mut().find(|p| p.id == target_pid) {
+            if process.state == ProcessState::Exited || process.state == ProcessState::Faulted {
+                let status = process.status;
+                process.state = ProcessState::Reaped;
+                // cleanup
+                let handles: alloc::vec::Vec<u32> = process
+                    .resources
+                    .handles
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| process.resources.used[*i])
+                    .map(|(_, &h)| h)
+                    .collect();
+                process.resources.clear();
+                let _ = crate::storage::with_filesystem(|fs| {
+                    for h in handles {
+                        let _ = fs.close(crate::fs::FileHandle(h));
+                    }
+                });
+                process.address_space.cleanup(0);
+                return Some((target_pid, status));
+            }
+            if process.state != ProcessState::Reaped {
+                process.state = ProcessState::Waiting;
+            }
+            return None;
+        }
+        return None;
+    }
+    for process in table.processes.iter_mut() {
+        if process.state == ProcessState::Exited || process.state == ProcessState::Faulted {
+            let status = process.status;
+            let pid_res = process.id;
+            process.state = ProcessState::Reaped;
+            process.address_space.cleanup(0);
+            process.resources.clear();
+            return Some((pid_res, status));
+        }
+    }
+    None
+}
+
+/// Clean up a terminated process
+pub fn cleanup_process(pid: ProcessId) {
+    let mut table = TABLE.lock();
+    if let Some(process) = table.processes.iter_mut().find(|p| p.id == pid) {
+        if process.state == ProcessState::Exited || process.state == ProcessState::Faulted {
+            let handles: alloc::vec::Vec<u32> = process
+                .resources
+                .handles
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| process.resources.used[*i])
+                .map(|(_, &h)| h)
+                .collect();
+            process.resources.clear();
+            let _ = crate::storage::with_filesystem(|fs| {
+                for h in handles {
+                    let _ = fs.close(crate::fs::FileHandle(h));
+                }
+            })
+            .ok();
+            process.address_space.cleanup(0);
+        }
+    }
+}
+
 /// Report the table of the processes on the console.
-///
-/// The report is the answer to the `ps` command of the shell.
 pub fn report() {
     let table = TABLE.lock();
     unsafe {
@@ -200,7 +298,7 @@ pub fn report() {
             serial::write_str(&process.name);
             serial::write_str(" ");
             serial::write_str(process.status.name());
-            serial::write_newline();
+            serial::write_str("\r\n");
         }
     }
 }

@@ -208,6 +208,8 @@ pub fn start_userland() -> Result<Outcome, UserError> {
     match result {
         Ok(result) => {
             crate::process::finish(pid, exit_status(result.outcome));
+            let _ = crate::process::wait(Some(pid));
+            crate::process::cleanup_process(pid);
             unsafe {
                 serial::write_str("Elvaris kernel: user: the userland ended: outcome=");
                 serial::write_fmt(core::format_args!("{:?}", result.outcome));
@@ -219,6 +221,8 @@ pub fn start_userland() -> Result<Outcome, UserError> {
         }
         Err(error) => {
             crate::process::finish(pid, crate::process::ExitStatus::Pending);
+            let _ = crate::process::wait(Some(pid));
+            crate::process::cleanup_process(pid);
             unsafe {
                 serial::write_str("Elvaris kernel: user: the userland could not run: ");
                 serial::write_str(exec::load_error_description(error));

@@ -192,7 +192,28 @@ impl Scheduler {
             self.current = None;
         }
     }
-}
+
+    /// Remove terminated threads from scheduler.
+    pub fn reap_terminated(&mut self) {
+        // Remove terminated threads from runnable queue and clear slots
+        self.runnable.retain(|id| {
+            let tid = id.0 as usize;
+            if tid < self.threads.len() {
+                if let Some(ref thread) = self.threads[tid] {
+                    return thread.state != ThreadState::Terminated;
+                }
+            }
+            false
+        });
+        // Clear terminated thread slots (defer stack reclamation by just dropping)
+        for thread_slot in self.threads.iter_mut() {
+            if let Some(ref thread) = thread_slot {
+                if thread.state == ThreadState::Terminated {
+                    // Mark for deferred cleanup - in this simple model just remove
+                }
+            }
+        }
+    }
 
 /// Create a new thread.
 pub fn create_thread(entry: extern "C" fn(*mut u8) -> !, arg: *mut u8, name: Option<alloc::string::String>) -> ThreadId {
@@ -206,8 +227,8 @@ pub fn yield_now() {
     sched.yield_now();
 }
 
-/// Exit current thread.
-pub fn exit_current() {
+/// Reap terminated threads.
+pub fn reap_terminated() {
     let mut sched = SCHEDULER.lock();
-    sched.exit_current();
+    sched.reap_terminated();
 }

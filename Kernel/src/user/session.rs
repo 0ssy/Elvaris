@@ -401,5 +401,7 @@ pub fn handle_fault(frame: &InterruptFrame, vector: u8) -> ! {
         }
     }
 
+    // Try to clean up if we have process context
+    // Note: In this design, cleanup is handled by caller
     terminate(OUTCOME_FAULTED, vector as u64)
 }

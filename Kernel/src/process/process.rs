@@ -1,4 +1,5 @@
 use alloc::string::String;
+use alloc::vec::Vec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProcessId(pub u64);
@@ -25,6 +26,8 @@ impl ProcessState {
             ProcessState::Faulted => "faulted",
             ProcessState::Reaped => "reaped",
         }
+    }
+}
     }
 }
 
@@ -81,24 +84,49 @@ pub struct SecurityIdentity {
     pub gid: u64,
 }
 
-#[derive(Debug, Clone, Copy)]
+pub const MAX_RESOURCES: usize = 8;
+
+#[derive(Debug, Clone)]
 pub struct ResourceTable {
     pub count: usize,
+    pub handles: [u32; MAX_RESOURCES],
+    pub used: [bool; MAX_RESOURCES],
 }
 
 impl ResourceTable {
     pub const fn empty() -> Self {
-        Self { count: 0 }
+        Self {
+            count: 0,
+            handles: [0; MAX_RESOURCES],
+            used: [false; MAX_RESOURCES],
+        }
+    }
+
+    pub fn add_handle(&mut self, handle: u32) {
+        for i in 0..MAX_RESOURCES {
+            if !self.used[i] {
+                self.handles[i] = handle;
+                self.used[i] = true;
+                self.count += 1;
+                break;
+            }
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.count = 0;
+        self.used = [false; MAX_RESOURCES];
     }
 }
-
-pub const MAX_OWNED_FRAMES: usize = 32;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AddressSpace {
     pub pml4_phys: u64,
     pub owned_count: usize,
     pub user_pages: u64,
+    /// Track owned physical frames (for cleanup)
+    pub owned_frames: [u64; MAX_OWNED_FRAMES],
+    pub owned_frames_count: usize,
 }
 
 impl AddressSpace {
@@ -107,7 +135,17 @@ impl AddressSpace {
             pml4_phys,
             owned_count: 0,
             user_pages: 0,
+            owned_frames: [0; MAX_OWNED_FRAMES],
+            owned_frames_count: 0,
         }
+    }
+
+    pub fn track_frame(&mut self, frame: u64) {
+        if self.owned_frames_count < MAX_OWNED_FRAMES {
+            self.owned_frames[self.owned_frames_count] = frame;
+            self.owned_frames_count += 1;
+        }
+        self.owned_count += 1;
     }
 }
 
@@ -116,7 +154,6 @@ pub struct ProgramDescriptor {
     pub entry: u64,
 }
 
-pub const MAX_RESOURCES: usize = 8;
 
 #[derive(Debug, Clone)]
 pub struct Process {

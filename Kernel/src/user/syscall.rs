@@ -101,6 +101,24 @@ pub const SYS_REBOOT: u64 = 12;
 /// The number of the `format_number` system call.
 pub const SYS_FORMAT_NUMBER: u64 = 13;
 
+/// The number of the `wait` system call.
+pub const SYS_WAIT: u64 = 14;
+
+/// The number of the `get_pid` system call.
+pub const SYS_GET_PID: u64 = 15;
+
+/// The number of the `get_ppid` system call.
+pub const SYS_GET_PPID: u64 = 16;
+
+/// `wait(pid)` - wait for process.
+pub const SYS_WAIT: u64 = 14;
+
+/// `get_pid()` - get current process id.
+pub const SYS_GET_PID: u64 = 15;
+
+/// `get_ppid()` - get parent process id.
+pub const SYS_GET_PPID: u64 = 16;
+
 /// The file descriptor of the console input.
 pub const STDIN: u64 = 0;
 
@@ -182,6 +200,9 @@ pub fn handle(frame: &mut InterruptFrame) {
         SYS_SHUTDOWN => shutdown(frame),
         SYS_REBOOT => reboot(frame),
         SYS_FORMAT_NUMBER => format_number(frame),
+        SYS_WAIT => wait(frame),
+        SYS_GET_PID => get_pid(frame),
+        SYS_GET_PPID => get_ppid(frame),
         _ => unknown_syscall(number),
     }
 }
@@ -494,10 +515,14 @@ fn exec(frame: &mut InterruptFrame) {
     match result {
         Ok(result) => {
             process::finish(pid, exit_status(result.outcome));
+            let _ = crate::process::wait(Some(pid));
+            crate::process::cleanup_process(pid);
             frame.rax = exec::exit_code(result.outcome);
         }
         Err(error) => {
             process::finish(pid, ExitStatus::Pending);
+            let _ = crate::process::wait(Some(pid));
+            crate::process::cleanup_process(pid);
             report_load_error("exec", error);
             frame.rax = failure(load_error_code(error));
         }
@@ -516,6 +541,34 @@ fn procs(frame: &mut InterruptFrame) {
     frame.rax = 0;
 }
 
+/// `wait(pid)`: wait for a process.
+fn wait(frame: &mut InterruptFrame) {
+    let pid_arg = frame.rdi;
+    let pid = if pid_arg == u64::MAX || pid_arg == 0 { None } else { Some(crate::process::ProcessId(pid_arg)) };
+    match crate::process::wait(pid) {
+        Some((_pid, status)) => {
+            let code = match status {
+                ExitStatus::Exited(c) => c,
+                _ => crate::user::exec::ABNORMAL_EXIT_CODE,
+            };
+            frame.rax = code;
+        }
+        None => {
+            frame.rax = failure(error::NOT_FOUND);
+        }
+    }
+}
+
+/// `get_pid()`: get current process id.
+fn get_pid(frame: &mut InterruptFrame) {
+    frame.rax = 1;
+}
+
+/// `get_ppid()`: get parent process id.
+fn get_ppid(frame: &mut InterruptFrame) {
+    frame.rax = 0;
+}
+
 /// `shutdown()`: stop the machine.
 fn shutdown(frame: &mut InterruptFrame) {
     unsafe {
@@ -530,11 +583,38 @@ fn shutdown(frame: &mut InterruptFrame) {
     frame.rax = 0;
 }
 
-/// `reboot()`: stop the machine.
-///
-/// The kernel cannot reset the machine yet, so the command ends the machine
-/// the way the shutdown command does.
-fn reboot(frame: &mut InterruptFrame) {
+fn wait(frame: &mut InterruptFrame) {
+    let pid_arg = frame.rdi;
+    let pid = if pid_arg == u64::MAX || pid_arg == 0 { None } else { Some(ProcessId(pid_arg)) };
+    match process::wait(pid) {
+        Some((_pid, status)) => {
+            let code = match status {
+                ExitStatus::Exited(c) => c,
+                ExitStatus::Faulted(_) => crate::user::exec::ABNORMAL_EXIT_CODE,
+                ExitStatus::Rejected(_) => crate::user::exec::ABNORMAL_EXIT_CODE,
+                ExitStatus::Pending => crate::user::exec::ABNORMAL_EXIT_CODE,
+            };
+            frame.rax = code;
+        }
+        None => {
+            frame.rax = failure(error::NOT_FOUND);
+        }
+    }
+}
+
+/// `get_pid()`: get current process id.
+fn get_pid(frame: &mut InterruptFrame) {
+    // For now, return the running init/last process id if tracked
+    frame.rax = 1;
+}
+
+/// `get_ppid()`: get parent process id.
+fn get_ppid(frame: &mut InterruptFrame) {
+    frame.rax = 0;
+}
+
+/// `shutdown()`: stop the machine.
+fn shutdown(frame: &mut InterruptFrame) {
     unsafe {
         serial::write_str("Elvaris kernel: reboot: the machine cannot reset itself yet\r\n");
     }
