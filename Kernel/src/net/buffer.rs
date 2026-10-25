@@ -4,6 +4,8 @@ use alloc::vec::Vec;
 
 pub const MAX_PACKET_SIZE: usize = 1518;
 pub const PACKET_HEADROOM: usize = 16;
+pub const MAX_RX_QUEUE: usize = 256;
+pub const MAX_TX_QUEUE: usize = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PacketError {
@@ -13,6 +15,7 @@ pub enum PacketError {
     UseAfterRelease,
     DoubleRelease,
     NoSpace,
+    QueueFull,
 }
 
 #[derive(Debug)]
@@ -48,7 +51,7 @@ impl PacketBuffer {
     }
 
     pub fn capacity(&self) -> usize {
-        self.data.len() - self.headroom
+        if self.data.len() >= self.headroom { self.data.len() - self.headroom } else { 0 }
     }
 
     pub fn len(&self) -> usize {
@@ -62,6 +65,9 @@ impl PacketBuffer {
     pub fn push(&mut self, bytes: &[u8]) -> Result<(), PacketError> {
         if !self.owned {
             return Err(PacketError::UseAfterRelease);
+        }
+        if bytes.len() > self.capacity() {
+            return Err(PacketError::TooLarge);
         }
         if self.len + bytes.len() > self.capacity() {
             return Err(PacketError::TooLarge);
@@ -114,3 +120,4 @@ impl Default for PacketBuffer {
         Self::new()
     }
 }
+

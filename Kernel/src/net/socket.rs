@@ -29,6 +29,7 @@ pub struct Socket {
     pub remote_port: u16,
     pub owner_pid: u64,
     pub recv_queue: Vec<Vec<u8>>,
+    pub nonblocking: bool,
 }
 
 impl Socket {
@@ -42,6 +43,7 @@ impl Socket {
             remote_port: 0,
             owner_pid,
             recv_queue: Vec::new(),
+            nonblocking: true,
         }
     }
 
@@ -49,9 +51,20 @@ impl Socket {
         if self.state != SocketState::Unbound {
             return false;
         }
+        if port < 1024 {
+            // privileged port - checked by caller
+        }
         self.local_ip = ip;
         self.local_port = port;
         self.state = SocketState::Bound;
+        true
+    }
+
+    pub fn listen(&mut self) -> bool {
+        if self.state != SocketState::Bound {
+            return false;
+        }
+        self.state = SocketState::Listening;
         true
     }
 
@@ -87,6 +100,14 @@ impl SocketTable {
         self.sockets.insert(id, Socket::new(socket_type, owner_pid));
         Some(id)
     }
+
+    pub fn get(&self, id: u64) -> Option<&Socket> {
+        self.sockets.get(&id)
+    }
+
+    pub fn get_mut(&mut self, id: u64) -> Option<&mut Socket> {
+        self.sockets.get_mut(&id)
+    }
 }
 
 impl Default for SocketTable {
@@ -94,4 +115,5 @@ impl Default for SocketTable {
         Self::new()
     }
 }
+
 
