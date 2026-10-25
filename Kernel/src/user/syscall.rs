@@ -107,8 +107,11 @@ pub const SYS_WAIT: u64 = 14;
 /// The number of the `get_pid` system call.
 pub const SYS_GET_PID: u64 = 15;
 
-/// The number of the `get_ppid` system call.
-pub const SYS_GET_PPID: u64 = 16;
+/// The number of the `getuid` system call.
+pub const SYS_GETUID: u64 = 17;
+
+/// The number of the `getgid` system call.
+pub const SYS_GETGID: u64 = 18;
 
 /// `wait(pid)` - wait for process.
 pub const SYS_WAIT: u64 = 14;
@@ -203,6 +206,8 @@ pub fn handle(frame: &mut InterruptFrame) {
         SYS_WAIT => wait(frame),
         SYS_GET_PID => get_pid(frame),
         SYS_GET_PPID => get_ppid(frame),
+        SYS_GETUID => getuid(frame),
+        SYS_GETGID => getgid(frame),
         _ => unknown_syscall(number),
     }
 }
@@ -602,14 +607,13 @@ fn wait(frame: &mut InterruptFrame) {
     }
 }
 
-/// `get_pid()`: get current process id.
-fn get_pid(frame: &mut InterruptFrame) {
-    // For now, return the running init/last process id if tracked
-    frame.rax = 1;
+/// `getuid()`: get current user id.
+fn getuid(frame: &mut InterruptFrame) {
+    frame.rax = 0; // root for now
 }
 
-/// `get_ppid()`: get parent process id.
-fn get_ppid(frame: &mut InterruptFrame) {
+/// `getgid()`: get current group id.
+fn getgid(frame: &mut InterruptFrame) {
     frame.rax = 0;
 }
 

@@ -25,6 +25,8 @@ pub use crate::process::process::{
     ResourceTable, SecurityIdentity, UserThread, UserThreadState,
 };
 
+use crate::security::{Credentials, ROOT_UID, ROOT_GID, USER_UID, USER_GID};
+
 pub const MAX_PROCESSES: usize = 16;
 
 /// The table of the processes of the machine.
@@ -128,17 +130,19 @@ static TABLE: Mutex<ProcessTable> = Mutex::new(ProcessTable::new());
 static RUNNING: Mutex<Option<ProcessId>> = Mutex::new(None);
 
 /// Register a program and return the identifier of its process.
-///
-/// The function gives the program the identifier of the next process, which
-/// makes the identifier of the first program of the machine the number one.
 pub fn register(name: &str, parent: Option<ProcessId>, entry: u64) -> ProcessId {
+    register_with_identity(name, parent, entry, Process::kernel_identity())
+}
+
+/// Register a program with specific identity
+pub fn register_with_identity(name: &str, parent: Option<ProcessId>, entry: u64, security: SecurityIdentity) -> ProcessId {
     let mut table = TABLE.lock();
     let id = table.allocate_pid();
     let process = Process {
         id,
         name: String::from(name),
         parent,
-        security: Process::kernel_identity(),
+        security,
         state: ProcessState::Created,
         status: ExitStatus::Pending,
         address_space: crate::process::process::AddressSpace::new(0),

@@ -149,17 +149,14 @@ impl FileType {
 }
 
 /// The owner of an object.
-///
-/// The model is deliberately simple: an object belongs either to the system
-/// or to one user. A system-owned object is available to every caller that
-/// has the right permission bit; an object that belongs to a user is
-/// available to that user only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Owner {
     /// The object belongs to the system.
     System,
     /// The object belongs to the user with that identifier.
     User(u64),
+    /// The object belongs to specific user and group
+    UserGroup { uid: u64, gid: u64 },
 }
 
 impl Owner {
@@ -168,6 +165,7 @@ impl Owner {
         match self {
             Owner::System => true,
             Owner::User(uid) => *uid == identity.uid,
+            Owner::UserGroup { uid, .. } => *uid == identity.uid,
         }
     }
 }
@@ -253,13 +251,23 @@ impl Permissions {
         }
     }
 
-    /// The permissions of a directory everybody may read.
-    pub const fn directory() -> Self {
+    /// The permissions of a file that only the owner may change.
+    pub const fn owner_only() -> Self {
         Permissions {
-            owner: Owner::System,
+            owner: Owner::User(1000),
             read: true,
             write: true,
-            execute: true,
+            execute: false,
+        }
+    }
+
+    /// The permissions of a root-owned system file.
+    pub const fn root_only() -> Self {
+        Permissions {
+            owner: Owner::User(0),
+            read: true,
+            write: true,
+            execute: false,
         }
     }
 

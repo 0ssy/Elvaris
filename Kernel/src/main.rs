@@ -14,6 +14,7 @@ mod memory;
 mod pmm;
 mod pci;
 mod process;
+mod security;
 mod serial;
 mod storage;
 mod sysinfo;
@@ -196,8 +197,11 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         serial::write_str("Elvaris kernel: heap: self_test ok\r\n");
     }
 
-    // Report the heap configuration and statistics.
-    heap::report();
+    // Initialize security subsystem
+    security::init();
+    unsafe {
+        serial::write_str("Elvaris kernel: security: initialized\r\n");
+    }
     unsafe {
         serial::write_str("Elvaris kernel: --- end heap ---\r\n");
     }

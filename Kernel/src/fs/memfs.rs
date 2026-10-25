@@ -573,7 +573,7 @@ impl FileSystem for MemFs {
                 Node::File {
                     data: Vec::new(),
                     permissions: Permissions {
-                        owner: Owner::System,
+                        owner: Owner::User(1000), // default to user
                         read: true,
                         write: true,
                         execute: flags.execute,

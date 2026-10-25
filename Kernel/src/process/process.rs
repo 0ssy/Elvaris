@@ -1,5 +1,6 @@
 use alloc::string::String;
 use alloc::vec::Vec;
+use crate::security::{Credentials, ROOT_UID, ROOT_GID, USER_UID, USER_GID};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProcessId(pub u64);
@@ -26,8 +27,6 @@ impl ProcessState {
             ProcessState::Faulted => "faulted",
             ProcessState::Reaped => "reaped",
         }
-    }
-}
     }
 }
 
@@ -78,10 +77,11 @@ pub struct UserThread {
     pub stack_pointer: u64,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct SecurityIdentity {
     pub uid: u64,
     pub gid: u64,
+    pub credentials: Credentials,
 }
 
 pub const MAX_RESOURCES: usize = 8;
@@ -199,6 +199,17 @@ impl Process {
     }
 
     pub const fn kernel_identity() -> SecurityIdentity {
-        SecurityIdentity { uid: 0, gid: 0 }
+        SecurityIdentity { 
+            uid: ROOT_UID, 
+            gid: ROOT_GID,
+            credentials: Credentials::root(),
+        }
     }
-}
+
+    pub const fn user_identity() -> SecurityIdentity {
+        SecurityIdentity { 
+            uid: USER_UID, 
+            gid: USER_GID,
+            credentials: Credentials::user(),
+        }
+    }
