@@ -25,6 +25,7 @@ mod user;
 mod virtio;
 mod vmm;
 mod packages;
+mod graphics;
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
@@ -209,6 +210,20 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     packages::init();
     unsafe {
         serial::write_str("Elvaris kernel: packages: initialized\r\n");
+    }
+
+    // Initialize graphics subsystem (Phase 18.1). Failure falls back to
+    // serial mode; it never prevents boot.
+    match graphics::init(boot_info) {
+        Ok(()) => unsafe {
+            serial::write_str("Elvaris kernel: graphics: initialized\r\n");
+        },
+        Err(err) => unsafe {
+            serial::write_str("graphics: initialization failed: ");
+            serial::write_fmt(core::format_args!("{:?}", err));
+            serial::write_str("\r\n");
+            serial::write_str("graphics: falling back to serial mode\r\n");
+        },
     }
 
     // Initialize networking

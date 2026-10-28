@@ -40,3 +40,4 @@ pub mod fs;
 pub mod pci;
 pub mod virtio;
 pub mod packages;
+pub mod graphics;
