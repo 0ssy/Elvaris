@@ -325,7 +325,7 @@ impl Drop for WindowImage {
 /// parent until the child program ended.
 pub fn save_window() -> Result<WindowImage, LoadError> {
     let block = crate::heap::alloc(WINDOW_SIZE, 16).map_err(|_| LoadError::OutOfMemory)?;
-    let mut image = WindowImage {
+    let image = WindowImage {
         buffer: block,
         size: WINDOW_SIZE,
     };

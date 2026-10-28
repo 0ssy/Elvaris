@@ -1,7 +1,5 @@
 //! Echo server (Milestone 15).
 
-use alloc::vec::Vec;
-
 pub struct EchoServer {
     running: bool,
     port: u16,

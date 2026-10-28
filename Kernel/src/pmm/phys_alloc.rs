@@ -102,7 +102,7 @@ impl PhysFrameAllocator {
         if self.total_frames % 64 != 0 {
             let extra_bits = (self.total_frames % 64) as u32;
             let last_word = bitmap_words - 1;
-            self.bitmap[last_word] = ((1u64 << extra_bits) - 1);
+            self.bitmap[last_word] = (1u64 << extra_bits) - 1;
         }
 
         true
@@ -275,7 +275,7 @@ impl PhysFrameAllocator {
             return false;
         }
         // Free the frame
-        self.bitmap[word] |= (1u64 << bit);
+        self.bitmap[word] |= 1u64 << bit;
         if self.allocated_frames > 0 {
             self.allocated_frames -= 1;
         }
@@ -316,7 +316,7 @@ impl PhysFrameAllocator {
             let frame_idx = self.addr_to_index(frame_addr);
             let word = (frame_idx as usize) / 64;
             let bit = (frame_idx as usize) % 64;
-            self.bitmap[word] |= (1u64 << bit);
+            self.bitmap[word] |= 1u64 << bit;
             if self.allocated_frames > 0 {
                 self.allocated_frames -= 1;
             }

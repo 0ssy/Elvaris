@@ -1,14 +1,11 @@
 //! Security and identity foundation for Elvaris.
 
-use alloc::vec::Vec;
-
 pub mod identity;
 pub mod authz;
 pub mod error;
 pub mod log;
 
-pub use identity::{Credentials, GroupId, Identity, IdentityDb, UserId, ROOT_GID, ROOT_UID, USER_GID, USER_UID, SERVICE_UID};
-pub use authz::{authorize, AccessMode, Resource, ResourceType};
+pub use identity::{Credentials, IdentityDb, ROOT_GID, ROOT_UID, USER_GID, USER_UID};
 pub use error::SecurityError;
 pub use log::{log_event, SecurityEvent};
 
@@ -33,6 +30,11 @@ pub fn init() {
 /// Get the global identity database
 pub fn identity_db() -> &'static IdentityDb {
     unsafe {
-        IDENTITY_DB.as_ref().expect("Security not initialized")
+        match &raw const IDENTITY_DB {
+            ptr => match *ptr {
+                Some(ref db) => db,
+                None => panic!("Security not initialized"),
+            },
+        }
     }
 }

@@ -821,6 +821,10 @@ fn write_permissions(image: &mut Vec<u8>, permissions: Permissions) {
             image.push(OWNER_USER);
             image.extend_from_slice(&uid.to_le_bytes());
         }
+        Owner::UserGroup { uid, .. } => {
+            image.push(OWNER_USER);
+            image.extend_from_slice(&uid.to_le_bytes());
+        }
     }
     let mut bits = 0u8;
     if permissions.read {

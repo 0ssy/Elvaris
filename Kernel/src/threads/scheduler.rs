@@ -145,7 +145,7 @@ impl Scheduler {
                     unsafe {
                         serial::write_str("Elvaris kernel: thread: switch ");
                         // print ids
-                        let mut print_id = |id: usize| {
+                        let print_id = |id: usize| {
                             let mut n = id as u64;
                             if n == 0 { serial::write_str("0"); } else {
                                 let mut buf = [0u8; 20];
@@ -207,13 +207,14 @@ impl Scheduler {
         });
         // Clear terminated thread slots (defer stack reclamation by just dropping)
         for thread_slot in self.threads.iter_mut() {
-            if let Some(ref thread) = thread_slot {
+            if let Some(thread) = thread_slot {
                 if thread.state == ThreadState::Terminated {
                     // Mark for deferred cleanup - in this simple model just remove
                 }
             }
         }
     }
+}
 
 /// Create a new thread.
 pub fn create_thread(entry: extern "C" fn(*mut u8) -> !, arg: *mut u8, name: Option<alloc::string::String>) -> ThreadId {

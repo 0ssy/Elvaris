@@ -4,9 +4,6 @@
 
 use crate::process::process::AddressSpace;
 use crate::pmm;
-use crate::vmm::mapper::Mapper;
-use crate::vmm::page_table::{PAGE_SIZE, entry_flags, FRAME_MASK};
-use crate::user::address::{USER_ADDRESS_SPACE_END, USER_ADDRESS_SPACE_START};
 use crate::serial;
 
 impl AddressSpace {
@@ -16,7 +13,7 @@ impl AddressSpace {
 
     /// Clean up user address space mappings and release owned frames.
     /// Preserves kernel mappings.
-    pub fn cleanup(&mut self, phys_offset: u64) {
+    pub fn cleanup(&mut self, _phys_offset: u64) {
         unsafe {
             serial::write_str("Elvaris kernel: process: cleaning up address space\r\n");
         }

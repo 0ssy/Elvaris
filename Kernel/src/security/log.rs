@@ -23,7 +23,6 @@ pub fn log_event(event: SecurityEvent) {
         serial::write_str(event.result);
         if let Some(pid) = event.pid {
             serial::write_str(" pid=");
-            let mut buf = [0u8; 32];
             serial::write_fmt(core::format_args!("{}", pid));
         }
         if let Some(uid) = event.uid {

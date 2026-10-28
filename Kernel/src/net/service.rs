@@ -1,7 +1,5 @@
 //! Network service.
 
-use alloc::vec::Vec;
-
 #[derive(Debug, Clone)]
 pub struct NetworkConfig {
     pub ip: [u8; 4],

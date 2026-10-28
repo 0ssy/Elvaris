@@ -14,8 +14,7 @@ use alloc::string::String;
 extern crate alloc;
 
 pub use context::ThreadContext;
-pub use stack::{KernelStack, KERNEL_STACK_SIZE};
-pub use scheduler::{create_thread, yield_now, exit_current};
+pub use stack::KernelStack;
 
 /// Thread identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

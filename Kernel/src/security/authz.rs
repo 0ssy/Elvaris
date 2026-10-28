@@ -1,7 +1,7 @@
 //! Authorization logic.
 
-use crate::security::{Credentials, SecurityError, ROOT_UID};
-use crate::fs::{Owner, Permissions, Access};
+use crate::security::{Credentials, SecurityError};
+use crate::fs::{Permissions, Access};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceType {

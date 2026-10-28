@@ -11,6 +11,5 @@ pub mod udp;
 pub mod tcp;
 pub mod perm;
 pub mod server;
-
-pub use buffer::{PacketBuffer, PacketError};
+pub mod service;
 pub use device::{NetworkDevice, MacAddress, NetError};

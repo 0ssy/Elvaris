@@ -29,19 +29,19 @@ pub struct TcpConnection {
 }
 
 pub struct TcpManager {
-    conns: BTreeMap<(u16, [u8; 4], u16), TcpConnection>,
-    listen_backlog: usize,
+    _conns: BTreeMap<(u16, [u8; 4], u16), TcpConnection>,
+    _listen_backlog: usize,
 }
 
 impl TcpManager {
     pub fn new() -> Self {
         TcpManager {
-            conns: BTreeMap::new(),
-            listen_backlog: 128,
+            _conns: BTreeMap::new(),
+            _listen_backlog: 128,
         }
     }
 
-    pub fn listen(&mut self, port: u16) {
+    pub fn listen(&mut self, _port: u16) {
         // Mark as listening
     }
 

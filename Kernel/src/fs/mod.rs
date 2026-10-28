@@ -67,7 +67,7 @@ pub mod path;
 mod tests;
 
 pub use memfs::MemFs;
-pub use path::{Path, PathError};
+pub use path::PathError;
 
 /// The errors a filesystem reports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -268,6 +268,16 @@ impl Permissions {
             read: true,
             write: true,
             execute: false,
+        }
+    }
+
+    /// The permissions of a directory: everybody may list and enter it.
+    pub const fn directory() -> Self {
+        Permissions {
+            owner: Owner::System,
+            read: true,
+            write: false,
+            execute: true,
         }
     }
 

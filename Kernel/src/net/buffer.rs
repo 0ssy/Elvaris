@@ -29,7 +29,8 @@ pub struct PacketBuffer {
 
 impl PacketBuffer {
     pub fn new() -> Self {
-        let mut data = vec![0u8; MAX_PACKET_SIZE + PACKET_HEADROOM];
+        let mut data = Vec::new();
+        data.resize(MAX_PACKET_SIZE + PACKET_HEADROOM, 0);
         PacketBuffer {
             data,
             len: 0,
@@ -40,7 +41,8 @@ impl PacketBuffer {
     }
 
     pub fn with_capacity(cap: usize) -> Self {
-        let mut data = vec![0u8; cap + PACKET_HEADROOM];
+        let mut data = Vec::new();
+        data.resize(cap + PACKET_HEADROOM, 0);
         PacketBuffer {
             data,
             len: 0,
