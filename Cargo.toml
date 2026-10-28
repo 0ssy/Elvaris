@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["Kernel", "os"]
+members = ["Kernel", "os", "packages", "sdk"]
 
 # `panic = "abort"` is required for the bare-metal kernel target
 # (`x86_64-unknown-none`). Profiles must be defined at the workspace root;

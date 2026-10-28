@@ -24,6 +24,7 @@ mod threads;
 mod user;
 mod virtio;
 mod vmm;
+mod packages;
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
@@ -202,6 +203,12 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     security::init();
     unsafe {
         serial::write_str("Elvaris kernel: security: initialized\r\n");
+    }
+
+    // Initialize package subsystem
+    packages::init();
+    unsafe {
+        serial::write_str("Elvaris kernel: packages: initialized\r\n");
     }
 
     // Initialize networking
