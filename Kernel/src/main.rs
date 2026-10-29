@@ -395,3 +395,12 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 
     halt()
 }
+mod surface;
+mod render;
+mod graphics_input;
+mod compositor;
+mod window;
+mod graphics_session;
+mod terminal_emulator;
+mod desktop;
+mod graphics_test;
