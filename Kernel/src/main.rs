@@ -7,7 +7,6 @@ mod block;
 mod bootinfo;
 mod console;
 mod cpu;
-mod device;
 mod exit;
 mod fs;
 mod heap;
@@ -16,24 +15,30 @@ mod memory;
 mod pmm;
 mod pci;
 mod device;
+#[cfg(feature = "usb")]
 mod usb;
+#[cfg(feature = "audio")]
 mod audio;
+#[cfg(feature = "audio")]
 mod audio_driver;
 mod power;
 mod sleep;
 mod hotplug;
+mod devicetree;
 mod process;
 mod security;
 mod net;
 mod serial;
 mod storage;
 mod sysinfo;
+mod vmm;
 #[cfg(feature = "bare")]
 mod threads;
 mod user;
 mod virtio;
-mod vmm;
+#[cfg(feature = "packages")]
 mod packages;
+#[cfg(feature = "graphics")]
 mod graphics;
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -216,9 +221,12 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     }
 
     // Initialize package subsystem
-    packages::init();
-    unsafe {
-        serial::write_str("Elvaris kernel: packages: initialized\r\n");
+    #[cfg(feature = "packages")]
+    {
+        packages::init();
+        unsafe {
+            serial::write_str("Elvaris kernel: packages: initialized\r\n");
+        }
     }
 
     // Initialize the device manager and discover PCI hardware. Devices are
@@ -237,32 +245,38 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     // Initialize the input subsystem (Phase 19.2). Physical-style keyboard and
     // mouse devices are registered as DeviceClass::Input and routed through
     // the shared input-event abstraction.
-    input::init();
+    input::device::init();
     unsafe {
         serial::write_str("Elvaris kernel: input: initialized\r\n");
     }
 
-    // Discover USB host controllers on the PCI bus (class 0x0C, subclass 0x03)
-    // and register them with the USB subsystem. USB enumeration happens as
-    // devices attach.
-    usb::discover_host_controllers();
-    usb::report();
-
-    // Initialize the audio subsystem (Phase 19.4). Audio mixing runs through
-    // the audio service; applications do not access audio hardware directly.
-    audio::init();
-    unsafe {
-        serial::write_str("Elvaris kernel: audio: initialized\r\n");
+    #[cfg(feature = "usb")]
+    {
+        // Discover USB host controllers on the PCI bus (class 0x0C, subclass 0x03)
+        // and register them with the USB subsystem. USB enumeration happens as
+        // devices attach.
+        usb::discover_host_controllers();
+        usb::report();
     }
 
-    // Discover physical audio devices (Phase 19.5). A driver is bound when a
-    // device is attached; discovery itself never prevents boot.
-    let found = audio_driver::discover_audio_devices();
-    unsafe {
-        serial::write_fmt(core::format_args!(
-            "Elvaris kernel: audio: {} device(s) discovered\r\n",
-            found
-        ));
+    #[cfg(feature = "audio")]
+    {
+        // Initialize the audio subsystem (Phase 19.4). Audio mixing runs through
+        // the audio service; applications do not access audio hardware directly.
+        audio::init();
+        unsafe {
+            serial::write_str("Elvaris kernel: audio: initialized\r\n");
+        }
+
+        // Discover physical audio devices (Phase 19.5). A driver is bound when a
+        // device is attached; discovery itself never prevents boot.
+        let found = audio_driver::discover_audio_devices();
+        unsafe {
+            serial::write_fmt(core::format_args!(
+                "Elvaris kernel: audio: {} device(s) discovered\r\n",
+                found
+            ));
+        }
     }
 
     // Initialize the power subsystem (Phase 19.6). Power and battery
@@ -280,18 +294,21 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         serial::write_str("Elvaris kernel: sleep: initialized\r\n");
     }
 
-    // Initialize graphics subsystem (Phase 18.1). Failure falls back to
-    // serial mode; it never prevents boot.
-    match graphics::init(boot_info) {
-        Ok(()) => unsafe {
-            serial::write_str("Elvaris kernel: graphics: initialized\r\n");
-        },
-        Err(err) => unsafe {
-            serial::write_str("graphics: initialization failed: ");
-            serial::write_fmt(core::format_args!("{:?}", err));
-            serial::write_str("\r\n");
-            serial::write_str("graphics: falling back to serial mode\r\n");
-        },
+    #[cfg(feature = "graphics")]
+    {
+        // Initialize graphics subsystem (Phase 18.1). Failure falls back to
+        // serial mode; it never prevents boot.
+        match graphics::init(boot_info) {
+            Ok(()) => unsafe {
+                serial::write_str("Elvaris kernel: graphics: initialized\r\n");
+            },
+            Err(err) => unsafe {
+                serial::write_str("graphics: initialization failed: ");
+                serial::write_fmt(core::format_args!("{:?}", err));
+                serial::write_str("\r\n");
+                serial::write_str("graphics: falling back to serial mode\r\n");
+            },
+        }
     }
 
     // Initialize networking
@@ -463,12 +480,21 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 
     halt()
 }
+#[cfg(feature = "graphics")]
 mod surface;
+#[cfg(feature = "graphics")]
 mod render;
+#[cfg(feature = "graphics")]
 mod graphics_input;
+#[cfg(feature = "graphics")]
 mod compositor;
+#[cfg(feature = "graphics")]
 mod window;
+#[cfg(feature = "graphics")]
 mod graphics_session;
+#[cfg(feature = "shell")]
 mod terminal_emulator;
+#[cfg(feature = "desktop")]
 mod desktop;
+#[cfg(feature = "graphics")]
 mod graphics_test;

@@ -566,6 +566,7 @@ impl FileSystem for MemFs {
                 return Err(FsError::NotFound);
             }
             // The parent has to exist before the file can be created.
+            let uid = self.identity.uid;
             let parent = self.find_parent_mut(&path).ok_or(FsError::NotFound)?;
             let name = path.file_name().ok_or(FsError::InvalidPath)?;
             parent.insert(
@@ -573,7 +574,7 @@ impl FileSystem for MemFs {
                 Node::File {
                     data: Vec::new(),
                     permissions: Permissions {
-                        owner: Owner::User(1000), // default to user
+                        owner: Owner::User(uid),
                         read: true,
                         write: true,
                         execute: flags.execute,

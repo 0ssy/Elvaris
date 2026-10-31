@@ -271,12 +271,13 @@ impl Permissions {
         }
     }
 
-    /// The permissions of a directory: everybody may list and enter it.
+    /// The permissions of a directory: everybody may list, enter, and create
+    /// entries in it.
     pub const fn directory() -> Self {
         Permissions {
             owner: Owner::System,
             read: true,
-            write: false,
+            write: true,
             execute: true,
         }
     }

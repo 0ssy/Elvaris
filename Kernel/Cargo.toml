@@ -8,6 +8,16 @@ description = "Elvaris bare-metal kernel (x86-64, no_std)"
 default = []
 bare = []
 alloc = []
+# Optional subsystems, disabled by default for the resource-constrained
+# embedded (headless service / minimal) profile. Enable individually for
+# desktop/development builds.
+graphics = []
+audio = []
+usb = []
+desktop = []
+shell = []
+packages = []
+debug = []
 [dependencies]
 bootloader_api = "0.11.17"
 x86_64 = "0.15"

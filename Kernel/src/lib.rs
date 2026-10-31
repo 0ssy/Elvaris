@@ -39,21 +39,51 @@ pub mod fs;
 
 pub mod pci;
 pub mod device;
+
+#[cfg(feature = "usb")]
 pub mod usb;
+
+#[cfg(feature = "audio")]
 pub mod audio;
+
+#[cfg(feature = "audio")]
 pub mod audio_driver;
+
 pub mod power;
 pub mod sleep;
 pub mod hotplug;
+pub mod devicetree;
 pub mod virtio;
+
+#[cfg(feature = "packages")]
 pub mod packages;
+
+#[cfg(feature = "graphics")]
 pub mod graphics;
+
+#[cfg(feature = "graphics")]
 pub mod surface;
+
+#[cfg(feature = "graphics")]
 pub mod render;
+
+#[cfg(feature = "graphics")]
 pub mod graphics_input;
+
+#[cfg(feature = "graphics")]
 pub mod compositor;
+
+#[cfg(feature = "graphics")]
 pub mod window;
+
+#[cfg(feature = "graphics")]
 pub mod graphics_session;
+
+#[cfg(feature = "shell")]
 pub mod terminal_emulator;
+
+#[cfg(feature = "desktop")]
 pub mod desktop;
+
+#[cfg(feature = "graphics")]
 pub mod graphics_test;
