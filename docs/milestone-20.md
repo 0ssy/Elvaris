@@ -158,36 +158,47 @@ universal OTA; replacing Milestone 17 packaging or Milestone 19 device model.
 - [x] Bare-metal x86-64-unknown-none build compiles cleanly
 - [x] Resource-constrained feature gating (graphics, audio, usb, desktop, shell, packages, debug)
 - [x] Related filesystem regressions fixed
+- [x] Embedded image boots on QEMU q35 (boot integration test: exit code 33, all serial markers present)
+- [x] Minimal profile boots (kernel initializes all subsystems without panic during QEMU boot)
 
 ### Pending — runtime completion and verification
 
-- [ ] Embedded image boots on QEMU q35
-- [ ] Minimal profile boots and starts configured service
-- [ ] Headless profile boots and starts configured service
-- [ ] Development profile boots
-- [ ] Device discovery through the embedded boot path
-- [ ] Minimal init and service supervision
-- [ ] Service dependencies and failure isolation
-- [ ] Read-only system and writable state separation
-- [ ] Embedded storage behavior
-- [ ] Watchdog and health monitoring
-- [ ] Embedded networking profile
-- [ ] Embedded application contract and permissions
-- [ ] Signed embedded updates
-- [ ] Rollback and recovery mode
-- [ ] Boot-loop prevention
-- [ ] Failure-injection tests
-- [ ] Resource and startup measurements
+- [ ] Minimal profile boots and starts configured service (no init/service manager yet)
+- [ ] Headless profile boots and starts configured service (no init/service manager yet)
+- [ ] Development profile boots (requires shell)
+- [ ] Device discovery through the embedded boot path (PCI/USB/audio discovery works during boot; DT parser not wired to ACPI-based QEMU q35 boot)
+- [ ] Minimal init and service supervision (not implemented)
+- [ ] Service dependencies and failure isolation (not implemented)
+- [ ] Read-only system and writable state separation (not implemented)
+- [ ] Embedded storage behavior (storage::initialize works during boot; read-only enforcement not implemented)
+- [ ] Watchdog and health monitoring (not implemented)
+- [ ] Embedded networking profile (net::service::init_network() works during boot; profile-specific config not implemented)
+- [ ] Embedded application contract and permissions (not implemented)
+- [ ] Signed embedded updates (not implemented)
+- [ ] Rollback and recovery mode (not implemented)
+- [ ] Boot-loop prevention (not implemented)
+- [ ] Failure-injection tests (not implemented)
+- [ ] Resource and startup measurements (not implemented)
 - [ ] Physical-target validation or explicit documented limitation
 
-These items require QEMU boot, runtime service tests, update/rollback tests, and measurement harnesses. They are not yet implemented or verified.
+### Integration test results
+
+| Test | Result |
+|------|--------|
+| boot | Passed (QEMU q35, exit code 33, all markers) |
+| heap | 1 passed, 1 failed (pre-existing QEMU huge-page issue: `MappingFailed(HugePageUnsupported)`) |
+| user | 2 passed, 0 failed |
+| lib (default) | 237 passed, 0 failed |
+| lib (all features) | 337 passed, 0 failed |
+
+These items require new subsystems (init/service manager, watchdog, updates, recovery, read-only enforcement) that are not yet implemented.
 
 ## Phase Index
 
 | Phase | Title | Status |
 |-------|-------|--------|
 | 20.0 | Embedded Requirements and Target Selection | Complete |
-| 20.1 | Embedded Boot and Image Layout | Pending |
+| 20.1 | Embedded Boot and Image Layout | Complete (verified via QEMU boot test) |
 | 20.2 | Device-Tree and Hardware Description | Complete (verified) |
 | 20.3 | Embedded Device Configuration | Pending |
 | 20.4 | Resource-Constrained Kernel Profile | Complete (verified) |

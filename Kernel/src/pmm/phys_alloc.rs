@@ -7,11 +7,13 @@
 extern crate alloc;
 
 use crate::pmm::frame::FRAME_SIZE;
-use alloc::vec;
-use alloc::vec::Vec;
 use bootloader_api::info::{MemoryRegion, MemoryRegionKind};
 
 const MAX_REGIONS: usize = 256;
+/// Maximum number of u64 words in the frame bitmap (3072 words = up to 768 MiB RAM).
+const BITMAP_MAX_WORDS: usize = 3072;
+/// Maximum number of reserved frame addresses tracked.
+const RESERVED_MAX_FRAMES: usize = 256;
 
 #[derive(Debug, Clone, Copy)]
 struct ManagedRegion {
@@ -38,9 +40,13 @@ pub struct PhysFrameAllocator {
     total_frames: u64,
     allocated_frames: u64,
     /// Bitmap tracking free/allocated frames across all regions
-    bitmap: Vec<u64>,
-    /// Reserved frames that must never be released
-    reserved: Vec<u64>,
+    bitmap: [u64; BITMAP_MAX_WORDS],
+    /// Number of valid words in `bitmap`.
+    bitmap_words: usize,
+    /// Reserved frame addresses that must never be released
+    reserved: [u64; RESERVED_MAX_FRAMES],
+    /// Number of valid entries in `reserved`.
+    reserved_count: usize,
 }
 
 impl PhysFrameAllocator {
@@ -50,8 +56,10 @@ impl PhysFrameAllocator {
             count: 0,
             total_frames: 0,
             allocated_frames: 0,
-            bitmap: Vec::new(),
-            reserved: Vec::new(),
+            bitmap: [0u64; BITMAP_MAX_WORDS],
+            bitmap_words: 0,
+            reserved: [0u64; RESERVED_MAX_FRAMES],
+            reserved_count: 0,
         }
     }
 
@@ -64,8 +72,8 @@ impl PhysFrameAllocator {
         self.count = 0;
         self.total_frames = 0;
         self.allocated_frames = 0;
-        self.bitmap.clear();
-        self.reserved.clear();
+        self.bitmap_words = 0;
+        self.reserved_count = 0;
 
         for r in regions {
             if self.count >= MAX_REGIONS {
@@ -97,7 +105,13 @@ impl PhysFrameAllocator {
 
         // Initialize bitmap: all frames free (bit set = free)
         let bitmap_words = ((self.total_frames as usize) + 63) / 64;
-        self.bitmap = vec![u64::MAX; bitmap_words];
+        if bitmap_words > BITMAP_MAX_WORDS {
+            return false;
+        }
+        for i in 0..bitmap_words {
+            self.bitmap[i] = u64::MAX;
+        }
+        self.bitmap_words = bitmap_words;
         // If total_frames not multiple of 64, mask off extra bits
         if self.total_frames % 64 != 0 {
             let extra_bits = (self.total_frames % 64) as u32;
@@ -121,9 +135,19 @@ impl PhysFrameAllocator {
         let word = (frame_idx as usize) / 64;
         let bit = (frame_idx as usize) % 64;
         self.bitmap[word] &= !(1u64 << bit);
-        if !self.reserved.contains(&addr) {
-            self.reserved.push(addr);
+        if !self.is_reserved(addr) && self.reserved_count < RESERVED_MAX_FRAMES {
+            self.reserved[self.reserved_count] = addr;
+            self.reserved_count += 1;
         }
+    }
+
+    fn is_reserved(&self, addr: u64) -> bool {
+        for i in 0..self.reserved_count {
+            if self.reserved[i] == addr {
+                return true;
+            }
+        }
+        false
     }
 
     fn is_valid_frame(&self, addr: u64) -> bool {
@@ -184,7 +208,7 @@ impl PhysFrameAllocator {
         for i in 0..self.total_frames {
             let word = (i as usize) / 64;
             let bit = (i as usize) % 64;
-            if word >= self.bitmap.len() {
+            if word >= self.bitmap_words {
                 break;
             }
             if (self.bitmap[word] & (1u64 << bit)) != 0 {
@@ -217,7 +241,7 @@ impl PhysFrameAllocator {
                     let idx = start_idx + offset + j;
                     let word = (idx as usize) / 64;
                     let bit = (idx as usize) % 64;
-                    if word >= self.bitmap.len() || (self.bitmap[word] & (1u64 << bit)) == 0 {
+                    if word >= self.bitmap_words || (self.bitmap[word] & (1u64 << bit)) == 0 {
                         all_free = false;
                         break;
                     }
@@ -258,7 +282,7 @@ impl PhysFrameAllocator {
             return false;
         }
         // Check if reserved
-        if self.reserved.contains(&addr) {
+        if self.is_reserved(addr) {
             return false;
         }
         let frame_idx = self.addr_to_index(addr);
@@ -267,7 +291,7 @@ impl PhysFrameAllocator {
         }
         let word = (frame_idx as usize) / 64;
         let bit = (frame_idx as usize) % 64;
-        if word >= self.bitmap.len() {
+        if word >= self.bitmap_words {
             return false;
         }
         // Check if already free (double release)
@@ -290,7 +314,7 @@ impl PhysFrameAllocator {
         let mut all_valid = true;
         for i in 0..count {
             let frame_addr = addr + (i as u64) * FRAME_SIZE;
-            if !self.is_valid_frame(frame_addr) || self.reserved.contains(&frame_addr) {
+            if !self.is_valid_frame(frame_addr) || self.is_reserved(frame_addr) {
                 all_valid = false;
                 break;
             }
@@ -301,7 +325,7 @@ impl PhysFrameAllocator {
             }
             let word = (frame_idx as usize) / 64;
             let bit = (frame_idx as usize) % 64;
-            if word >= self.bitmap.len() || (self.bitmap[word] & (1u64 << bit)) != 0 {
+            if word >= self.bitmap_words || (self.bitmap[word] & (1u64 << bit)) != 0 {
                 // Double release or not allocated
                 all_valid = false;
                 break;
