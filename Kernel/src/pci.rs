@@ -252,6 +252,16 @@ impl Device {
         self.read16(OFFSET_DEVICE)
     }
 
+    /// The class code of the device (offset 0x0B).
+    pub fn class_code(&self) -> u8 {
+        self.read8(0x0B)
+    }
+
+    /// The subclass code of the device (offset 0x0B).
+    pub fn subclass_code(&self) -> u8 {
+        self.read8(0x0A)
+    }
+
     /// The command register of the device.
     pub fn command(&self) -> u16 {
         self.read16(OFFSET_COMMAND)
@@ -396,6 +406,33 @@ pub fn find_block_devices() -> Vec<Device> {
     let mut devices = find(VENDOR_VIRTIO, DEVICE_VIRTIO_BLK_TRANSITIONAL);
     devices.extend(find(VENDOR_VIRTIO, DEVICE_VIRTIO_BLK_MODERN));
     devices
+}
+
+/// Find PCI devices by class and subclass code.
+///
+/// The function walks the devices of the first bus and returns the ones
+/// that match. A device that is not present is skipped.
+pub fn find_by_class(class: u8, subclass: u8) -> Vec<Device> {
+    let mut found = Vec::new();
+    for bus in 0..=1u8 {
+        for device_number in 0..32u8 {
+            for function in 0..8u8 {
+                let location = Location {
+                    bus,
+                    device: device_number,
+                    function,
+                };
+                if !location.is_present() {
+                    continue;
+                }
+                let candidate = Device { location };
+                if candidate.class_code() == class && candidate.subclass_code() == subclass {
+                    found.push(candidate);
+                }
+            }
+        }
+    }
+    found
 }
 
 /// Write a word to a port.

@@ -1,5 +1,7 @@
 pub mod event;
 pub mod queue;
+pub mod hardware;
+pub mod device;
 
 pub use event::InputEvent;
 pub use queue::{InputQueue, QUEUE_CAPACITY};

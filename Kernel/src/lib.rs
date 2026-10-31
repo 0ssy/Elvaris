@@ -38,6 +38,13 @@ pub mod block;
 pub mod fs;
 
 pub mod pci;
+pub mod device;
+pub mod usb;
+pub mod audio;
+pub mod audio_driver;
+pub mod power;
+pub mod sleep;
+pub mod hotplug;
 pub mod virtio;
 pub mod packages;
 pub mod graphics;

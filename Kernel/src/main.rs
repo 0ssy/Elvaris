@@ -7,12 +7,21 @@ mod block;
 mod bootinfo;
 mod console;
 mod cpu;
+mod device;
 mod exit;
 mod fs;
 mod heap;
+mod input;
 mod memory;
 mod pmm;
 mod pci;
+mod device;
+mod usb;
+mod audio;
+mod audio_driver;
+mod power;
+mod sleep;
+mod hotplug;
 mod process;
 mod security;
 mod net;
@@ -210,6 +219,65 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     packages::init();
     unsafe {
         serial::write_str("Elvaris kernel: packages: initialized\r\n");
+    }
+
+    // Initialize the device manager and discover PCI hardware. Devices are
+    // registered as Discovered; drivers bind to them in later phases. Discovery
+    // failure does not prevent boot.
+    device::init();
+    let discovered = device::discover_pci();
+    unsafe {
+        serial::write_fmt(core::format_args!(
+            "Elvaris kernel: device: discovered {} pci devices\r\n",
+            discovered
+        ));
+    }
+    device::report();
+
+    // Initialize the input subsystem (Phase 19.2). Physical-style keyboard and
+    // mouse devices are registered as DeviceClass::Input and routed through
+    // the shared input-event abstraction.
+    input::init();
+    unsafe {
+        serial::write_str("Elvaris kernel: input: initialized\r\n");
+    }
+
+    // Discover USB host controllers on the PCI bus (class 0x0C, subclass 0x03)
+    // and register them with the USB subsystem. USB enumeration happens as
+    // devices attach.
+    usb::discover_host_controllers();
+    usb::report();
+
+    // Initialize the audio subsystem (Phase 19.4). Audio mixing runs through
+    // the audio service; applications do not access audio hardware directly.
+    audio::init();
+    unsafe {
+        serial::write_str("Elvaris kernel: audio: initialized\r\n");
+    }
+
+    // Discover physical audio devices (Phase 19.5). A driver is bound when a
+    // device is attached; discovery itself never prevents boot.
+    let found = audio_driver::discover_audio_devices();
+    unsafe {
+        serial::write_fmt(core::format_args!(
+            "Elvaris kernel: audio: {} device(s) discovered\r\n",
+            found
+        ));
+    }
+
+    // Initialize the power subsystem (Phase 19.6). Power and battery
+    // information is exposed read-only; no power state is changed yet.
+    power::init();
+    unsafe {
+        serial::write_str("Elvaris kernel: power: initialized\r\n");
+    }
+
+    // Initialize the sleep/resume foundation (Phase 19.7). Suspend requires
+    // device ownership and power information to be stable first.
+    sleep::init();
+    hotplug::init();
+    unsafe {
+        serial::write_str("Elvaris kernel: sleep: initialized\r\n");
     }
 
     // Initialize graphics subsystem (Phase 18.1). Failure falls back to
