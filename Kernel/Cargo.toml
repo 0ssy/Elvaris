@@ -18,6 +18,8 @@ desktop = []
 shell = []
 packages = []
 debug = []
+init = []
+embedded = []
 [dependencies]
 bootloader_api = "0.11.17"
 x86_64 = "0.15"

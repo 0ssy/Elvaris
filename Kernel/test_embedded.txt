@@ -1,0 +1,357 @@
+   Compiling kernel v0.1.0 (C:\Users\josep\Desktop\Elvaris\Kernel)
+warning: unused import: `Access`
+  --> Kernel\src\fs\tests.rs:13:5
+   |
+13 |     Access, FileHandle, FileSystem, FileType, FsError, Identity, OpenFlags, Owner, Permissions,
+   |     ^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `alloc::vec::Vec`
+  --> Kernel\src\power.rs:12:5
+   |
+12 | use alloc::vec::Vec;
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `HealthCheck`
+ --> Kernel\src\init\supervisor.rs:9:5
+  |
+9 |     HealthCheck, RestartPolicy, ServiceManifest, ServiceState,
+  |     ^^^^^^^^^^^
+
+warning: unused imports: `String` and `ToString`
+  --> Kernel\src\init\mod.rs:34:21
+   |
+34 | use alloc::string::{String, ToString};
+   |                     ^^^^^^  ^^^^^^^^
+
+warning: unused import: `alloc::vec::Vec`
+  --> Kernel\src\init\mod.rs:35:5
+   |
+35 | use alloc::vec::Vec;
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused imports: `String` and `ToString`
+ --> Kernel\src\embedded\state\layout.rs:6:21
+  |
+6 | use alloc::string::{String, ToString};
+  |                     ^^^^^^  ^^^^^^^^
+
+warning: unused import: `alloc::format`
+ --> Kernel\src\embedded\state\mount.rs:9:5
+  |
+9 | use alloc::format;
+  |     ^^^^^^^^^^^^^
+
+warning: unused imports: `String` and `ToString`
+  --> Kernel\src\embedded\state\mount.rs:10:21
+   |
+10 | use alloc::string::{String, ToString};
+   |                     ^^^^^^  ^^^^^^^^
+
+warning: unused import: `core::fmt`
+  --> Kernel\src\embedded\state\mount.rs:11:5
+   |
+11 | use core::fmt;
+   |     ^^^^^^^^^
+
+warning: unused import: `super::layout::StorageArea`
+ --> Kernel\src\embedded\state\protection.rs:7:5
+  |
+7 | use super::layout::StorageArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `super::StateError`
+ --> Kernel\src\embedded\state\protection.rs:8:5
+  |
+8 | use super::StateError;
+  |     ^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `String` and `ToString`
+  --> Kernel\src\embedded\state\mod.rs:28:21
+   |
+28 | use alloc::string::{String, ToString};
+   |                     ^^^^^^  ^^^^^^^^
+
+warning: unused import: `alloc::vec::Vec`
+  --> Kernel\src\embedded\state\mod.rs:29:5
+   |
+29 | use alloc::vec::Vec;
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused imports: `String` and `ToString`
+ --> Kernel\src\embedded\storage\target.rs:6:21
+  |
+6 | use alloc::string::{String, ToString};
+  |                     ^^^^^^  ^^^^^^^^
+
+warning: unused import: `core::fmt`
+ --> Kernel\src\embedded\storage\layout.rs:8:5
+  |
+8 | use core::fmt;
+  |     ^^^^^^^^^
+
+warning: unused import: `alloc::vec::Vec`
+ --> Kernel\src\embedded\storage\atomic.rs:8:5
+  |
+8 | use alloc::vec::Vec;
+  |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `super::StorageError`
+ --> Kernel\src\embedded\storage\health.rs:6:5
+  |
+6 | use super::StorageError;
+  |     ^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `String` and `ToString`
+  --> Kernel\src\embedded\storage\mod.rs:34:21
+   |
+34 | use alloc::string::{String, ToString};
+   |                     ^^^^^^  ^^^^^^^^
+
+warning: unused import: `alloc::vec::Vec`
+  --> Kernel\src\embedded\storage\mod.rs:35:5
+   |
+35 | use alloc::vec::Vec;
+   |     ^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+  --> Kernel\src\embedded\storage\target.rs:75:13
+   |
+74 |         match *self {
+   |               ----- this expression has type `target::StorageTarget`
+75 |             StorageTargetType::VirtioBlock => "virtio-block",
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `StorageTarget`, found `StorageTargetType`
+   |
+help: you might have meant to use field `target_type` whose type is `target::StorageTargetType`
+   |
+74 |         match *self.target_type {
+   |                    ++++++++++++
+
+error[E0308]: mismatched types
+  --> Kernel\src\embedded\storage\target.rs:76:13
+   |
+74 |         match *self {
+   |               ----- this expression has type `target::StorageTarget`
+75 |             StorageTargetType::VirtioBlock => "virtio-block",
+76 |             StorageTargetType::SdEmmc => "sd-emmc",
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^ expected `StorageTarget`, found `StorageTargetType`
+   |
+help: you might have meant to use field `target_type` whose type is `target::StorageTargetType`
+   |
+74 |         match *self.target_type {
+   |                    ++++++++++++
+
+error[E0308]: mismatched types
+  --> Kernel\src\embedded\storage\target.rs:77:13
+   |
+74 |         match *self {
+   |               ----- this expression has type `target::StorageTarget`
+...
+77 |             StorageTargetType::SpiFlash => "spi-flash",
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `StorageTarget`, found `StorageTargetType`
+   |
+help: you might have meant to use field `target_type` whose type is `target::StorageTargetType`
+   |
+74 |         match *self.target_type {
+   |                    ++++++++++++
+
+error[E0308]: mismatched types
+  --> Kernel\src\embedded\storage\target.rs:78:13
+   |
+74 |         match *self {
+   |               ----- this expression has type `target::StorageTarget`
+...
+78 |             StorageTargetType::Nvme => "nvme",
+   |             ^^^^^^^^^^^^^^^^^^^^^^^ expected `StorageTarget`, found `StorageTargetType`
+   |
+help: you might have meant to use field `target_type` whose type is `target::StorageTargetType`
+   |
+74 |         match *self.target_type {
+   |                    ++++++++++++
+
+error[E0308]: mismatched types
+  --> Kernel\src\embedded\storage\target.rs:79:13
+   |
+74 |         match *self {
+   |               ----- this expression has type `target::StorageTarget`
+...
+79 |             StorageTargetType::Sata => "sata",
+   |             ^^^^^^^^^^^^^^^^^^^^^^^ expected `StorageTarget`, found `StorageTargetType`
+   |
+help: you might have meant to use field `target_type` whose type is `target::StorageTargetType`
+   |
+74 |         match *self.target_type {
+   |                    ++++++++++++
+
+error[E0308]: mismatched types
+  --> Kernel\src\embedded\storage\target.rs:80:13
+   |
+74 |         match *self {
+   |               ----- this expression has type `target::StorageTarget`
+...
+80 |             StorageTargetType::UsbStorage => "usb-storage",
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `StorageTarget`, found `StorageTargetType`
+   |
+help: you might have meant to use field `target_type` whose type is `target::StorageTargetType`
+   |
+74 |         match *self.target_type {
+   |                    ++++++++++++
+
+error[E0308]: mismatched types
+  --> Kernel\src\embedded\storage\target.rs:81:13
+   |
+74 |         match *self {
+   |               ----- this expression has type `target::StorageTarget`
+...
+81 |             StorageTargetType::MemoryOnly => "memory-only",
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `StorageTarget`, found `StorageTargetType`
+   |
+help: you might have meant to use field `target_type` whose type is `target::StorageTargetType`
+   |
+74 |         match *self.target_type {
+   |                    ++++++++++++
+
+error[E0599]: no method named `name` found for enum `target::StorageTargetType` in the current scope
+   --> Kernel\src\embedded\storage\target.rs:132:51
+    |
+ 11 | pub enum StorageTargetType {
+    | -------------------------- method `name` not found for this enum
+...
+132 |         assert_eq!(StorageTargetType::VirtioBlock.name(), "virtio-block");
+    |                                                   ^^^^
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+note: `NetworkDevice` defines an item `name`, perhaps you need to implement it
+   --> Kernel\src\net\device.rs:42:1
+    |
+ 42 | pub trait NetworkDevice {
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 50 |     fn name(&self) -> &'static str;
+    |
+help: there is a method `ne` with a similar name, but with different arguments
+   --> C:\Users\josep\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library/core\src\cmp.rs:278:5
+    |
+253 | pub const trait PartialEq<Rhs: PointeeSized = Self>: PointeeSized {
+...
+278 |     fn ne(&self, other: &Rhs) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `name` found for enum `target::StorageTargetType` in the current scope
+   --> Kernel\src\embedded\storage\target.rs:133:46
+    |
+ 11 | pub enum StorageTargetType {
+    | -------------------------- method `name` not found for this enum
+...
+133 |         assert_eq!(StorageTargetType::SdEmmc.name(), "sd-emmc");
+    |                                              ^^^^
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+note: `NetworkDevice` defines an item `name`, perhaps you need to implement it
+   --> Kernel\src\net\device.rs:42:1
+    |
+ 42 | pub trait NetworkDevice {
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 50 |     fn name(&self) -> &'static str;
+    |
+help: there is a method `ne` with a similar name, but with different arguments
+   --> C:\Users\josep\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library/core\src\cmp.rs:278:5
+    |
+253 | pub const trait PartialEq<Rhs: PointeeSized = Self>: PointeeSized {
+...
+278 |     fn ne(&self, other: &Rhs) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `name` found for enum `target::StorageTargetType` in the current scope
+   --> Kernel\src\embedded\storage\target.rs:134:50
+    |
+ 11 | pub enum StorageTargetType {
+    | -------------------------- method `name` not found for this enum
+...
+134 |         assert_eq!(StorageTargetType::MemoryOnly.name(), "memory-only");
+    |                                                  ^^^^
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+note: `NetworkDevice` defines an item `name`, perhaps you need to implement it
+   --> Kernel\src\net\device.rs:42:1
+    |
+ 42 | pub trait NetworkDevice {
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 50 |     fn name(&self) -> &'static str;
+    |
+help: there is a method `ne` with a similar name, but with different arguments
+   --> C:\Users\josep\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib/rustlib/src/rust\library/core\src\cmp.rs:278:5
+    |
+253 | pub const trait PartialEq<Rhs: PointeeSized = Self>: PointeeSized {
+...
+278 |     fn ne(&self, other: &Rhs) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> Kernel\src\block\tests.rs:118:9
+    |
+118 |     let mut too_long = [0x22u8; BLOCK_SIZE + 1];
+    |         ----^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> Kernel\src\device.rs:756:13
+    |
+756 |         let mut h2 = DeviceHandle { id: id2, generation: 1 };
+    |             ----^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> Kernel\src\device.rs:829:13
+    |
+829 |         let mut h2 = DeviceHandle { id: id2, generation: 1 };
+    |             ----^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> Kernel\src\power.rs:153:9
+    |
+153 |     let mut present = data.present;
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: value assigned to `time_remaining_s` is never read
+   --> Kernel\src\power.rs:158:32
+    |
+158 |     let mut time_remaining_s = None;
+    |                                ^^^^ this value is reassigned later and never used
+...
+187 |     time_remaining_s = data.time_remaining_s;
+    |     ---------------------------------------- `time_remaining_s` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> Kernel\src\init\supervisor.rs:635:13
+    |
+635 |         let mut m = test_manifest("app", &[], RestartPolicy::Never);
+    |             ----^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> Kernel\src\init\supervisor.rs:662:13
+    |
+662 |         let mut m = test_manifest("app", &[], RestartPolicy::Never);
+    |             ----^
+    |             |
+    |             help: remove this `mut`
+
+Some errors have detailed explanations: E0308, E0599.
+For more information about an error, try `rustc --explain E0308`.
+warning: `kernel` (lib test) generated 26 warnings
+error: could not compile `kernel` (lib test) due to 10 previous errors; 26 warnings emitted

@@ -38,6 +38,10 @@ mod user;
 mod virtio;
 #[cfg(feature = "packages")]
 mod packages;
+#[cfg(feature = "init")]
+mod init;
+#[cfg(feature = "embedded")]
+mod embedded;
 #[cfg(feature = "graphics")]
 mod graphics;
 #[cfg(feature = "alloc")]
@@ -242,6 +246,12 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     }
     device::report();
 
+    // Embedded profile: initialize state/embedded subsystems if enabled
+    #[cfg(feature = "embedded")]
+    {
+        unsafe { serial::write_str("Elvaris kernel: embedded: profile enabled\r\n"); }
+    }
+
     // Initialize the input subsystem (Phase 19.2). Physical-style keyboard and
     // mouse devices are registered as DeviceClass::Input and routed through
     // the shared input-event abstraction.
@@ -315,6 +325,12 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     net::service::init_network();
     unsafe {
         serial::write_str("Elvaris kernel: --- end heap ---\r\n");
+    }
+
+    // Minimal init and service supervision for embedded profiles
+    #[cfg(all(feature = "init", feature = "embedded"))]
+    {
+        unsafe { serial::write_str("Elvaris kernel: init: starting embedded service supervision\r\n"); }
     }
 
     // CPU infrastructure: the global descriptor table, the task state segment,

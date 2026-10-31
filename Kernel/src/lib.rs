@@ -55,6 +55,9 @@ pub mod hotplug;
 pub mod devicetree;
 pub mod virtio;
 
+#[cfg(feature = "init")]
+pub mod init;
+
 #[cfg(feature = "packages")]
 pub mod packages;
 
@@ -87,3 +90,6 @@ pub mod desktop;
 
 #[cfg(feature = "graphics")]
 pub mod graphics_test;
+
+#[cfg(feature = "embedded")]
+pub mod embedded;
