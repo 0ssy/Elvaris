@@ -144,63 +144,62 @@ Bluetooth expansion; cameras; cloud fleet management; remote enrollment;
 containers/orchestration; zero-downtime updates; automatic factory reset;
 universal OTA; replacing Milestone 17 packaging or Milestone 19 device model.
 
-## Exit Criteria
+## Verification Status
 
-- [ ] Primary embedded target documented
-- [ ] Embedded support levels defined
-- [ ] Embedded boot image builds
-- [ ] Embedded image boots
-- [ ] Device-tree or platform discovery works
-- [ ] Required hardware discovered
-- [ ] Device ownership enforced
-- [ ] Minimal profile builds and boots
-- [ ] Headless profile builds and boots
-- [ ] Development profile builds and boots
-- [ ] Resource budgets defined and measured
-- [ ] Low-memory behavior controlled
-- [ ] Minimal init starts configured services
-- [ ] Service dependencies work
-- [ ] Service failure isolated
-- [ ] System filesystem read-only
-- [ ] Writable state separate and documented
-- [ ] Embedded storage tested
-- [ ] Watchdog works or documented limitation
-- [ ] Health monitoring works
-- [ ] Embedded networking works if required
-- [ ] Application manifest and limits work
-- [ ] Application permissions enforced
-- [ ] Signed embedded updates work
-- [ ] Interrupted updates recoverable
-- [ ] Failed updates roll back
-- [ ] Safe mode works
-- [ ] Recovery mode works
-- [ ] Boot-loop prevention works
-- [ ] Security hardening documented
-- [ ] Logging bounded
-- [ ] Failure-injection tests pass
-- [ ] QEMU embedded tests pass
-- [ ] Existing x86-64/ARM64/desktop/server/graphics/security/packaging tests pass
-- [ ] Startup and memory measurements recorded
-- [ ] Known limitations documented
+### Verified (v0.20-embedded-foundation)
+
+- [x] Primary embedded target documented (x86-64 QEMU q35, headless service profile)
+- [x] Embedded support levels defined
+- [x] Device-tree or platform discovery works (parser unit tests pass)
+- [x] Minimal profile builds (default feature set: 237 passed, 0 failed)
+- [x] Headless profile builds (all features: 337 passed, 0 failed)
+- [x] Development profile builds (all features: 337 passed, 0 failed)
+- [x] Existing kernel tests pass with no regressions
+- [x] Bare-metal x86-64-unknown-none build compiles cleanly
+- [x] Resource-constrained feature gating (graphics, audio, usb, desktop, shell, packages, debug)
+- [x] Related filesystem regressions fixed
+
+### Pending — runtime completion and verification
+
+- [ ] Embedded image boots on QEMU q35
+- [ ] Minimal profile boots and starts configured service
+- [ ] Headless profile boots and starts configured service
+- [ ] Development profile boots
+- [ ] Device discovery through the embedded boot path
+- [ ] Minimal init and service supervision
+- [ ] Service dependencies and failure isolation
+- [ ] Read-only system and writable state separation
+- [ ] Embedded storage behavior
+- [ ] Watchdog and health monitoring
+- [ ] Embedded networking profile
+- [ ] Embedded application contract and permissions
+- [ ] Signed embedded updates
+- [ ] Rollback and recovery mode
+- [ ] Boot-loop prevention
+- [ ] Failure-injection tests
+- [ ] Resource and startup measurements
+- [ ] Physical-target validation or explicit documented limitation
+
+These items require QEMU boot, runtime service tests, update/rollback tests, and measurement harnesses. They are not yet implemented or verified.
 
 ## Phase Index
 
-| Phase | Title |
-|-------|-------|
-| 20.0 | Embedded Requirements and Target Selection |
-| 20.1 | Embedded Boot and Image Layout |
-| 20.2 | Device-Tree and Hardware Description |
-| 20.3 | Embedded Device Configuration |
-| 20.4 | Resource-Constrained Kernel Profile |
-| 20.5 | Minimal Init and Service Manager |
-| 20.6 | Read-Only and Immutable System Model |
-| 20.7 | Embedded Storage and Filesystem |
-| 20.8 | Watchdog and Health Monitoring |
-| 20.9 | Embedded Networking |
-| 20.10 | Embedded Application Contract |
-| 20.11 | Embedded Updates |
-| 20.12 | Recovery and Safe Mode |
-| 20.13 | Embedded Security Hardening |
-| 20.14 | Optional Real-Time Scheduling |
-| 20.15 | Startup and Resource Measurements |
-| 20.16 | Testing and Validation |
+| Phase | Title | Status |
+|-------|-------|--------|
+| 20.0 | Embedded Requirements and Target Selection | Complete |
+| 20.1 | Embedded Boot and Image Layout | Pending |
+| 20.2 | Device-Tree and Hardware Description | Complete (verified) |
+| 20.3 | Embedded Device Configuration | Pending |
+| 20.4 | Resource-Constrained Kernel Profile | Complete (verified) |
+| 20.5 | Minimal Init and Service Manager | Pending |
+| 20.6 | Read-Only and Immutable System Model | Pending |
+| 20.7 | Embedded Storage and Filesystem | Pending |
+| 20.8 | Watchdog and Health Monitoring | Pending |
+| 20.9 | Embedded Networking | Pending |
+| 20.10 | Embedded Application Contract | Pending |
+| 20.11 | Embedded Updates | Pending |
+| 20.12 | Recovery and Safe Mode | Pending |
+| 20.13 | Embedded Security Hardening | Pending |
+| 20.14 | Optional Real-Time Scheduling | Pending |
+| 20.15 | Startup and Resource Measurements | Pending |
+| 20.16 | Testing and Validation | Pending |
