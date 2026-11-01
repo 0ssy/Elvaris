@@ -2,10 +2,10 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::security::{Credentials, ROOT_UID, USER_UID};
-    use crate::security::authz::{authorize, AccessMode, Resource, ResourceType};
-    use crate::security::error::SecurityError;
-    use crate::fs::{Permissions, Access};
+    use kernel::security::{Credentials, ROOT_UID, USER_UID};
+    use kernel::security::authz::{authorize, AccessMode, Resource, ResourceType};
+    use kernel::security::error::SecurityError;
+    use kernel::fs::{Permissions, Access};
 
     #[test]
     fn root_is_privileged() {
