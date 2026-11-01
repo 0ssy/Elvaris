@@ -172,5 +172,3 @@ fn collect_files(
     Ok(())
 }
 
-    /// Foreign platform (for compatibility packages)
-    #[arg(long)]
