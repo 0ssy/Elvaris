@@ -93,3 +93,10 @@ pub mod graphics_test;
 
 #[cfg(feature = "embedded")]
 pub mod embedded;
+
+#[cfg(feature = "packages")]
+pub mod compat;
+
+#[cfg(feature = "packages")]
+pub mod compat;
+

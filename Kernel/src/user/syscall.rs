@@ -841,3 +841,10 @@ pub fn describe_failure(value: u64) -> &'static str {
 pub fn refused_call(call: &str) -> ! {
     invalid_argument(call, "the call was refused")
 }
+
+/// Native API version constants (Milestone 21.1)
+pub const NATIVE_API_MAJOR: u32 = 1;
+pub const NATIVE_API_MINOR: u32 = 0;
+pub const NATIVE_API_PATCH: u32 = 0;
+pub const ABI_VERSION: u32 = 1;
+

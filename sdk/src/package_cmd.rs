@@ -171,3 +171,15 @@ fn collect_files(
     }
     Ok(())
 }
+
+    /// Foreign platform (for compatibility packages)
+    #[arg(long)]
+    pub foreign_platform: Option<String>,
+
+    /// Compatibility runtime name
+    #[arg(long)]
+    pub compat_runtime: Option<String>,
+
+
+// CLI extended for compatibility metadata (Milestone 21.6)
+

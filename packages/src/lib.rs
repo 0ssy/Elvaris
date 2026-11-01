@@ -12,3 +12,7 @@ pub use error::{PackageError, Result};
 pub use manifest::{Architecture, Dependency, Manifest, Permission};
 pub use package::{FileEntry, Package, PackageBuilder, PackageReader};
 pub use signing::{KeyPair, PublicKey, Signature, sign_package, verify_package_signature};
+
+pub mod compat;
+pub use compat::CompatibilityMetadata;
+
