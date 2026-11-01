@@ -2,10 +2,10 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::net::buffer::{PacketBuffer, PacketError, MAX_PACKET_SIZE};
-    use crate::net::ethernet::parse_frame;
-    use crate::net::arp::ArpCache;
-    use crate::net::MacAddress;
+    use kernel::net::buffer::{PacketBuffer, PacketError, MAX_PACKET_SIZE};
+    use kernel::net::ethernet::parse_frame;
+    use kernel::net::arp::ArpCache;
+    use kernel::net::MacAddress;
 
     #[test]
     fn packet_buffer_basic() {
