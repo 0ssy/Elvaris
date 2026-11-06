@@ -9,6 +9,9 @@
 //!
 //! This is a development-only mechanism. It is NOT part of the Elvaris
 //! security model and must never be present in a production build.
+//!
+//! Exit codes are retained for host/QEMU diagnostics and future panic paths.
+#![allow(dead_code)]
 
 /// I/O port QEMU reads for the debug-con device.
 const DEBUGCON_PORT: u16 = 0x402;

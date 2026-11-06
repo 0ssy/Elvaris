@@ -4,6 +4,9 @@
 //! The output goes to the serial console, and the input comes from an input
 //! source.
 //!
+//! Console limits and convenience methods are retained as userland I/O API.
+#![allow(dead_code)]
+//!
 //! # The input is separated from the driver
 //!
 //! The console does not know where its input comes from: it asks an

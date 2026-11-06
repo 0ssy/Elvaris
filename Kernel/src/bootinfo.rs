@@ -4,6 +4,9 @@
 //! The bootloader data is external input. This module does not trust any
 //! field implicitly; it reports what is actually present under the current
 //! UEFI configuration so the kernel can decide what to rely on.
+//!
+//! Report/counter helpers are retained as boot diagnostics API.
+#![allow(dead_code)]
 
 use crate::serial;
 use bootloader_api::info::{BootInfo, MemoryRegionKind, Optional};

@@ -1,5 +1,10 @@
 //! The system-call ABI.
 //!
+//! Diagnostic/validation helpers are retained for staged syscall surface and
+//! host-side/kernel diagnostics; unused items in the kernel binary are
+//! intentional.
+#![allow(dead_code)]
+//!
 //! A user program reaches the kernel through one instruction: `int 0x80`. The
 //! interrupt descriptor table entry of that vector is the only entry the
 //! processor accepts from user mode, so a user program cannot raise any

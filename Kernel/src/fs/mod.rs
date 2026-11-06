@@ -5,6 +5,10 @@
 //! the shell, about the program loader, about the format of a program image
 //! and about the emulator the kernel runs in.
 //!
+//! Staged filesystem APIs remain for host tests, syscall wiring, and future
+//! kernel/userland features; unused items in the kernel bin are intentional.
+#![allow(dead_code)]
+//!
 //! # The interface
 //!
 //! | Operation | Purpose |

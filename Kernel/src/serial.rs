@@ -7,6 +7,9 @@
 //!
 //! Output is synchronous, unbuffered, and has no locking. It is intended for
 //! early boot diagnostics only, not for general kernel logging.
+//!
+//! Low-level UART helpers are retained for diagnostics and staged console input.
+#![allow(dead_code)]
 
 /// I/O base address of COM1.
 const COM1_PORT: u16 = 0x3F8;

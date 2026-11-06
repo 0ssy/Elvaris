@@ -3,6 +3,9 @@
 //! Tracks usable physical memory frames and supports allocation and
 //! release. The bitmap allocator tracks which frames are free/allocated,
 //! respects reserved regions, and rejects double-releases.
+//!
+//! Contiguous/reservation operations are staged for future kernel use.
+#![allow(dead_code)]
 
 extern crate alloc;
 

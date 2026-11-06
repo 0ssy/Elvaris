@@ -1,4 +1,9 @@
 //! Networking stack for Elvaris (Milestone 15).
+//!
+//! The net subsystem is staged: protocol/device/service surfaces are retained for
+//! host tests and future kernel wiring, so unused items are intentional here.
+
+#![allow(dead_code)]
 
 pub mod buffer;
 pub mod device;

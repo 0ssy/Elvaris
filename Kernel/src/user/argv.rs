@@ -55,6 +55,7 @@ impl Arguments {
     }
 
     /// Build the arguments out of a list of words.
+    #[allow(dead_code)] // Retained for host tests and staged argv construction.
     pub fn from_words(words: &[&str]) -> Self {
         let mut entries = Vec::new();
         for word in words {
@@ -72,11 +73,13 @@ impl Arguments {
     }
 
     /// Whether the program has no argument at all.
+    #[allow(dead_code)] // Retained for host tests and staged argv API.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
     /// The argument with that index.
+    #[allow(dead_code)] // Retained for host tests and staged argv API.
     pub fn get(&self, index: usize) -> Option<&str> {
         self.entries.get(index).map(|entry| entry.as_str())
     }

@@ -1,6 +1,9 @@
 //! Physical memory management (PMM).
 //!
 //! This module wires up frame abstraction and physical frame allocation.
+//!
+//! Frame/reservation helpers are staged for upcoming memory-management paths.
+#![allow(dead_code)]
 
 use spin::Mutex;
 

@@ -72,6 +72,7 @@ pub enum BlockError {
 
 impl BlockError {
     /// A short description of the error, used in the serial diagnostics.
+    #[allow(dead_code)] // Diagnostic/helper method retained for staged block API.
     pub const fn description(&self) -> &'static str {
         match self {
             BlockError::OutOfRange => "the block index is outside the device",

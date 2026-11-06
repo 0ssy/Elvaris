@@ -1,4 +1,9 @@
 //! Security and identity foundation for Elvaris.
+//!
+//! Identity/authorization APIs are staged for upcoming kernel enforcement paths;
+//! unused surfaces are intentionally retained.
+
+#![allow(dead_code)]
 
 pub mod identity;
 pub mod authz;

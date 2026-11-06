@@ -97,6 +97,3 @@ pub mod embedded;
 #[cfg(feature = "packages")]
 pub mod compat;
 
-#[cfg(feature = "packages")]
-pub mod compat;
-

@@ -10,6 +10,10 @@
 //! 4. The window is written back, so that the caller finds itself exactly
 //!    where it was.
 //!
+//! Helper accessors/entry points are retained for host tests and staged exec
+//! flows; unused items in the kernel binary are intentional.
+#![allow(dead_code)]
+//!
 //! # The stack of the events
 //!
 //! The processor switches to the stack of the task state segment whenever an

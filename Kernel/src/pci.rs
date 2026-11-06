@@ -5,6 +5,9 @@
 //! registers that describe the device: who it is, which interrupts it uses,
 //! which memory it wants, and which capabilities it offers.
 //!
+//! Bus/probe helpers are staged for broader device discovery and drivers.
+#![allow(dead_code)]
+//!
 //! # The access mechanism
 //!
 //! The kernel uses the mechanism of the original PCI bus: a register in the

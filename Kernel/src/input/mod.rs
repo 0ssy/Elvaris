@@ -1,3 +1,10 @@
+//! Input abstraction layer.
+//!
+//! Decodes and routes input events, independent of the physical device.
+//!
+//! Event/queue abstractions are staged for future input device integration.
+#![allow(dead_code)]
+
 pub mod event;
 pub mod queue;
 pub mod hardware;

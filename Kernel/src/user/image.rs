@@ -60,6 +60,7 @@ pub enum ImageError {
 
 impl ImageError {
     /// A short description of the error, used in the serial diagnostics.
+    #[allow(dead_code)] // Diagnostic/helper method retained for staged image loader API.
     pub const fn description(&self) -> &'static str {
         match self {
             ImageError::TooShort => "the image is too short",

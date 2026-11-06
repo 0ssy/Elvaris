@@ -5,6 +5,10 @@
 //! commands are part of the shell, and every other command is a program of
 //! the filesystem that the shell starts with the `exec` system call.
 //!
+//! Buffer size constants are exposed for host tests and userland layout
+//! documentation; they may be unused in the kernel binary build.
+#![allow(dead_code)]
+//!
 //! # The commands
 //!
 //! | Command | What it does |

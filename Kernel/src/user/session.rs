@@ -355,6 +355,7 @@ pub fn count_syscall() {
 }
 
 /// The number of system calls the user program made.
+#[allow(dead_code)] // Retained for diagnostics/staged syscall accounting.
 pub fn syscall_count() -> u64 {
     let session = session();
     session.syscalls

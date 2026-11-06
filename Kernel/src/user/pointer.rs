@@ -70,6 +70,7 @@ pub fn validate_range(address: u64, length: u64) -> Result<(), PointerError> {
 /// The number of pages the range touches.
 ///
 /// The range has to be valid; use [`validate_range`] first.
+#[allow(dead_code)] // Retained for staged pointer validation/diagnostics.
 pub fn page_count(address: u64, length: u64) -> usize {
     if length == 0 {
         return 0;

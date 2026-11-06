@@ -4,6 +4,9 @@
 //! starts, it holds the programs of the machine, and every system call that
 //! touches a file goes through it.
 //!
+//! Query helpers are retained for staged sysinfo/diagnostic and storage APIs.
+#![allow(dead_code)]
+//!
 //! # The medium
 //!
 //! The filesystem lives on a disk when the machine has one: the kernel

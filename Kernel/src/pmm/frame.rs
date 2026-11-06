@@ -1,4 +1,7 @@
 //! Physical frame representation and utilities (4 KiB frames).
+//!
+//! Frame helpers are staged for PMM/VMM integration.
+#![allow(dead_code)]
 
 use bootloader_api::info::MemoryRegion;
 

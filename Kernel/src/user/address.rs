@@ -7,6 +7,9 @@
 //! away from the kernel heap, from the physical-memory direct map and from
 //! the memory mapped device registers.
 //!
+//! Validation helpers are retained for staged pointer/ABI checks.
+#![allow(dead_code)]
+//!
 //! ```text
 //!  0x0000_0080_0000_0000  user code      1 page   read + execute
 //!  0x0000_0080_0000_1000  user data      1 page   read + write, no execute
