@@ -48,9 +48,11 @@ pub fn run(args: RunArgs) -> Result<()> {
 }
 
 fn run_package(_qemu: &str, _package: &PathBuf, _machine: &str) -> Result<()> {
+    let _ = (_qemu, _package, _machine);
     bail!("running packages directly in QEMU requires kernel package support; not yet implemented");
 }
 
 fn run_binary(_qemu: &str, _binary: &PathBuf, _machine: &str) -> Result<()> {
+    let _ = (_qemu, _binary, _machine);
     bail!("running bare binaries in QEMU requires a bootable image; use elvaris-sdk update to create one");
 }

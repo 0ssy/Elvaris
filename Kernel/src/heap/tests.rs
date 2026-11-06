@@ -201,7 +201,6 @@ fn fragmentation_does_not_corrupt_the_heap() {
 fn zero_sized_allocation_is_defined() {
     let mut arena = make_arena(ARENA_SIZE);
     let ptr = arena.alloc(0, 16).expect("zero-sized allocation should succeed");
-    assert!(!ptr.as_ptr().is_null());
     assert_eq!(ptr.as_ptr() as usize % 16, 0);
 
     // A zero-sized allocation owns no memory: it is placed at the end of the

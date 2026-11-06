@@ -115,7 +115,7 @@ fn a_refused_write_does_not_change_the_block() {
         .write_block(1, &block(0x11))
         .expect("the write succeeds");
 
-    let mut too_long = [0x22u8; BLOCK_SIZE + 1];
+    let too_long = [0x22u8; BLOCK_SIZE + 1];
     assert_eq!(
         device.write_block(1, &too_long),
         Err(BlockError::BadBufferSize)

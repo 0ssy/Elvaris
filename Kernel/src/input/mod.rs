@@ -3,9 +3,6 @@ pub mod queue;
 pub mod hardware;
 pub mod device;
 
-pub use event::InputEvent;
-pub use queue::{InputQueue, QUEUE_CAPACITY};
-
 #[cfg(test)]
 mod tests {
     use super::event::InputEvent;

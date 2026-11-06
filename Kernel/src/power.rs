@@ -9,7 +9,6 @@
 
 #![allow(dead_code)]
 
-use alloc::vec::Vec;
 use spin::Mutex;
 
 use crate::serial;
@@ -150,19 +149,15 @@ pub struct AcpiBatteryData {
 /// Convert raw ACPI battery data into validated `BatteryInfo`. Invalid fields
 /// are dropped rather than propagated.
 pub fn acpi_to_battery_info(data: AcpiBatteryData) -> BatteryInfo {
-    let mut present = data.present;
+    let present = data.present;
     let mut percentage = None;
     let mut charging_state = ChargingState::Unknown;
     let mut voltage_mv = None;
     let mut energy_mwh = None;
-    let mut time_remaining_s = None;
 
     if let Some(pct) = data.percentage {
         if parse_percentage(pct).is_ok() {
             percentage = Some(pct);
-        } else {
-            // Invalid percentage: treat as data problem but keep battery present.
-            percentage = None;
         }
     }
 
@@ -184,15 +179,13 @@ pub fn acpi_to_battery_info(data: AcpiBatteryData) -> BatteryInfo {
         }
     }
 
-    time_remaining_s = data.time_remaining_s;
-
     BatteryInfo {
         present,
         percentage,
         charging_state,
         voltage_mv,
         energy_mwh,
-        time_remaining_s,
+        time_remaining_s: data.time_remaining_s,
         design_capacity_mwh: None,
         last_full_capacity_mwh: None,
     }

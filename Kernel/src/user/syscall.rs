@@ -842,9 +842,13 @@ pub fn refused_call(call: &str) -> ! {
     invalid_argument(call, "the call was refused")
 }
 
-/// Native API version constants (Milestone 21.1)
+/// Native API version constants (Milestone 21.1, staged for ABI/version queries).
+#[allow(dead_code)] // Exposed for future native SDK/syscall version negotiation.
 pub const NATIVE_API_MAJOR: u32 = 1;
+#[allow(dead_code)] // Exposed for future native SDK/syscall version negotiation.
 pub const NATIVE_API_MINOR: u32 = 0;
+#[allow(dead_code)] // Exposed for future native SDK/syscall version negotiation.
 pub const NATIVE_API_PATCH: u32 = 0;
+#[allow(dead_code)] // Exposed for future native SDK/syscall version negotiation.
 pub const ABI_VERSION: u32 = 1;
 

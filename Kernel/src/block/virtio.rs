@@ -26,6 +26,7 @@ const REQUEST_READ: u32 = 0;
 const REQUEST_WRITE: u32 = 1;
 
 /// The kind of a request that flushes the device.
+#[allow(dead_code)] // Reserved for virtio flush support beyond the current block trait path.
 const REQUEST_FLUSH: u32 = 4;
 
 /// The feature bit that says that the device can flush its medium.

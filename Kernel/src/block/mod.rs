@@ -56,6 +56,7 @@ pub const BLOCK_SIZE: usize = 512;
 
 /// The errors a block device reports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // Block API is staged; variants/methods are exercised by filesystem/storage milestones.
 pub enum BlockError {
     /// The block index is outside the device.
     OutOfRange,
@@ -91,6 +92,7 @@ impl BlockError {
 /// The trait asks for `Send` and `Sync`: the filesystem of the machine lives
 /// in a static variable, and the static variable has to be safe to reach
 /// from every part of the kernel.
+#[allow(dead_code)] // Block API is staged; some methods are used by future storage/filesystem integrations.
 pub trait BlockDevice: Send + Sync {
     /// The size of one block in bytes.
     fn block_size(&self) -> usize;
@@ -210,6 +212,7 @@ impl MemoryBlockDevice {
     /// The data is padded with zeros to a whole number of blocks. A data
     /// block that is longer than the device is refused with
     /// [`BlockError::OutOfRange`].
+    #[allow(dead_code)] // Used by staged on-disk/image-loading paths.
     pub fn from_bytes(data: &[u8]) -> Result<Self, BlockError> {
         let count = data.len().div_ceil(BLOCK_SIZE);
         let mut device = Self::new(count);
@@ -218,6 +221,7 @@ impl MemoryBlockDevice {
     }
 
     /// The number of blocks the device holds.
+    #[allow(dead_code)] // Convenience accessor; staged storage tooling.
     pub fn block_count(&self) -> usize {
         self.count
     }
@@ -226,6 +230,7 @@ impl MemoryBlockDevice {
     ///
     /// The function is used by the tests and by the on-disk format code; it
     /// copies the blocks, so the caller cannot reach into the device.
+    #[allow(dead_code)] // Used by staged on-disk/image snapshot paths.
     pub fn to_bytes(&self) -> Vec<u8> {
         self.blocks.clone()
     }
@@ -234,6 +239,7 @@ impl MemoryBlockDevice {
     ///
     /// A device that is not ready refuses every transfer. The kernel uses
     /// this when a medium fails.
+    #[allow(dead_code)] // Used by failure-injection paths in storage milestones.
     pub fn set_ready(&mut self, ready: bool) {
         self.ready = ready;
     }

@@ -5,8 +5,6 @@ use clap::Args;
 use packages::{
     Architecture, Dependency, Manifest, PackageBuilder, Permission,
 };
-use serde_json;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 #[derive(Args, Debug)]

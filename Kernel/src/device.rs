@@ -753,7 +753,7 @@ mod tests {
             vec![mmio_resource(0xF000_0000)],
             None,
         );
-        let mut h2 = DeviceHandle { id: id2, generation: 1 };
+        let h2 = DeviceHandle { id: id2, generation: 1 };
         let dev2 = mgr.devices.get_mut(&id2.0).unwrap();
         dev2.state = DeviceState::Unbound;
         assert_eq!(
@@ -826,7 +826,7 @@ mod tests {
             vec![mmio_resource(0xF000_0000)],
             None,
         );
-        let mut h2 = DeviceHandle { id: id2, generation: 1 };
+        let h2 = DeviceHandle { id: id2, generation: 1 };
         let dev2 = mgr.devices.get_mut(&id2.0).unwrap();
         dev2.state = DeviceState::Unbound;
         assert!(mgr.claim(h2, owner()).is_ok());

@@ -217,6 +217,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     unsafe {
         serial::write_str("Elvaris kernel: heap: self_test ok\r\n");
     }
+    heap::report();
 
     // Initialize security subsystem
     security::init();

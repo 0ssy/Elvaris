@@ -390,6 +390,7 @@ impl Transport {
     }
 
     /// The number of virtqueues of the device.
+    #[allow(dead_code)] // Diagnostic/introspection hook for staged multi-queue support.
     pub fn queue_count(&self) -> u16 {
         self.queue_count
     }
@@ -506,6 +507,7 @@ impl Queue {
     }
 
     /// The number of descriptors of the queue.
+    #[allow(dead_code)] // Diagnostic/introspection hook for staged virtio queue management.
     pub fn size(&self) -> u16 {
         self.size
     }

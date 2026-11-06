@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use super::memfs::MemFs;
 use super::path::{MAX_NAME_LENGTH, MAX_PATH_LENGTH, Path, PathError};
 use super::{
-    Access, FileHandle, FileSystem, FileType, FsError, Identity, OpenFlags, Owner, Permissions,
+    FileHandle, FileSystem, FileType, FsError, Identity, OpenFlags, Owner, Permissions,
 };
 
 // ---------------------------------------------------------------------------
