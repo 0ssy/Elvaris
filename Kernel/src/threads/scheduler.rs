@@ -91,12 +91,14 @@ impl Scheduler {
         if let Some(cid) = current_id {
             let tid = cid.0 as usize;
             if tid < self.threads.len() {
-                if let Some(ref mut thread) = self.threads[tid] {
-                    if thread.state == ThreadState::Running {
-                        thread.state = ThreadState::Runnable;
+            if let Some(ref mut thread) = self.threads[tid] {
+                if thread.state == ThreadState::Running {
+                    thread.state = ThreadState::Runnable;
+                    if !self.runnable.contains(&cid) {
                         self.runnable.push_back(cid);
                     }
                 }
+            }
             }
         }
         
