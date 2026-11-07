@@ -1,0 +1,1 @@
+# Scheduler\n\nProcess states: Created, Runnable (Ready), Running, Waiting (Blocked), Exited, Faulted, Reaped (Zombie/Reaped).\nTransition rules enforced in process::transition. Terminated processes excluded via is_schedulable/prune_reaped.\n

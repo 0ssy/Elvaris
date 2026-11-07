@@ -147,16 +147,42 @@ pub fn set_running(pid: ProcessId) {
     *RUNNING.lock() = Some(pid);
 }
 
-/// Record how a process ended.
+/// Record how a process ended and release all owned resources.
 pub fn finish(pid: ProcessId, status: ExitStatus) {
     let mut table = TABLE.lock();
     if let Some(process) = table.get_mut(pid) {
+        let handles: alloc::vec::Vec<u32> = process
+            .resources
+            .handles
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| process.resources.used[*i])
+            .map(|(_, &h)| h)
+            .collect();
+        process.resources.clear();
+        let _ = crate::storage::with_filesystem(|fs| {
+            for h in handles {
+                let _ = fs.close(crate::fs::FileHandle(h));
+            }
+        });
+        process.address_space.cleanup(0);
         process.finish(status);
+    }
+    // Reparent orphaned children.
+    for process in table.processes.iter_mut() {
+        if process.parent == Some(pid) {
+            process.parent = None;
+        }
     }
     let mut running = RUNNING.lock();
     if *running == Some(pid) {
         *running = None;
     }
+}
+
+/// Terminate a process (normal or crash) and clean up resources.
+pub fn terminate(pid: ProcessId, status: ExitStatus) {
+    finish(pid, status);
 }
 
 /// Find a process if it exists and is not reaped.
@@ -181,6 +207,11 @@ pub fn reap(pid: ProcessId) -> bool {
     table.reap(pid)
 }
 
+/// Reap a process exactly once (idempotent). Returns true only on first successful reap.
+pub fn reap_once(pid: ProcessId) -> bool {
+    reap(pid)
+}
+
 /// The number of processes the table holds.
 pub fn count() -> usize {
     TABLE.lock().count()
@@ -192,6 +223,16 @@ pub fn set_waiting(pid: ProcessId) {
     if let Some(process) = table.get_mut(pid) {
         process.state = ProcessState::Waiting;
     }
+}
+
+/// Wait for a specific child process (wrapper around wait).
+pub fn wait_child(child: ProcessId) -> Option<(ProcessId, ExitStatus)> {
+    wait(Some(child))
+}
+
+/// Wait for any child process.
+pub fn wait_any() -> Option<(ProcessId, ExitStatus)> {
+    wait(None)
 }
 
 /// Wait for a child process to exit/fault and reap it.
@@ -306,3 +347,107 @@ pub fn short_name(path: &str) -> String {
 
 pub mod address_space;
 pub mod process;
+
+/// Remove fully reaped processes from the table (prevents reuse/leaks).
+pub fn prune_reaped() {
+    let mut table = TABLE.lock();
+    table.processes.retain(|p| p.state != ProcessState::Reaped);
+}
+
+/// Mark a process blocked (transition to Waiting).
+pub fn mark_blocked(pid: ProcessId) -> bool {
+    transition(pid, ProcessState::Waiting)
+}
+
+/// Mark a process ready (transition to Runnable).
+pub fn mark_ready(pid: ProcessId) -> bool {
+    transition(pid, ProcessState::Runnable)
+}
+
+/// Resource usage snapshot for a process.
+pub fn resource_usage(pid: ProcessId) -> Option<(usize, u64, u64)> {
+    let table = TABLE.lock();
+    table.processes.iter().find(|p| p.id == pid).map(|p| (p.resources.count, p.frames_owned, p.syscalls))
+}
+
+/// Enforce state transition rules. Returns false on illegal transition.
+pub fn transition(pid: ProcessId, new_state: ProcessState) -> bool {
+    let mut table = TABLE.lock();
+    if let Some(process) = table.get_mut(pid) {
+        let ok = match (process.state, new_state) {
+            (ProcessState::Created, ProcessState::Runnable) => true,
+            (ProcessState::Runnable, ProcessState::Running) => true,
+            (ProcessState::Running, ProcessState::Waiting) => true,
+            (ProcessState::Running, ProcessState::Runnable) => true,
+            (ProcessState::Running, ProcessState::Exited) => true,
+            (ProcessState::Running, ProcessState::Faulted) => true,
+            (ProcessState::Waiting, ProcessState::Runnable) => true,
+            _ => false,
+        };
+        if ok {
+            process.state = new_state;
+        }
+        return ok;
+    }
+    false
+}
+
+#[derive(Debug, Clone)]
+pub struct ProcessInfo {
+    pub pid: u64,
+    pub parent: Option<u64>,
+    pub state: &'static str,
+    pub exit_code: Option<u64>,
+    pub handles: usize,
+    pub frames: u64,
+    pub syscalls: u64,
+}
+
+pub fn inspect(pid: ProcessId) -> Option<ProcessInfo> {
+    let table = TABLE.lock();
+    table.processes.iter().find(|p| p.id == pid).map(|p| ProcessInfo {
+        pid: p.id.0,
+        parent: p.parent.map(|x| x.0),
+        state: p.state.name(),
+        exit_code: p.exit_code(),
+        handles: p.resources.count,
+        frames: p.frames_owned,
+        syscalls: p.syscalls,
+    })
+}
+
+pub fn active_count() -> usize {
+    TABLE.lock().processes.iter().filter(|p| p.state != ProcessState::Exited && p.state != ProcessState::Faulted && p.state != ProcessState::Reaped).count()
+}
+
+pub fn zombie_count() -> usize {
+    TABLE.lock().processes.iter().filter(|p| p.state == ProcessState::Exited || p.state == ProcessState::Faulted).count()
+}
+
+pub fn inspect_all() -> alloc::vec::Vec<ProcessInfo> {
+    let table = TABLE.lock();
+    table.processes.iter().map(|p| ProcessInfo {
+        pid: p.id.0,
+        parent: p.parent.map(|x| x.0),
+        state: p.state.name(),
+        exit_code: p.exit_code(),
+        handles: p.resources.count,
+        frames: p.frames_owned,
+        syscalls: p.syscalls,
+    }).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pid_unique_and_cleanup() {
+        let p = register("t", None, 0);
+        finish(p, ExitStatus::Exited(0));
+        let info = inspect(p).unwrap();
+        assert_eq!(info.state, "exited");
+        assert!(reap_once(p));
+        assert!(!reap_once(p));
+    }
+}
